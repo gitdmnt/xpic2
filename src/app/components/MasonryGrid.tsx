@@ -91,6 +91,24 @@ export function findNeighbor(
   return best;
 }
 
+/** viewport と縦に交差して表示中のうち、上端が最小で同値なら左端が最小のタイル。 */
+export function findTopLeftVisible(
+  placements: readonly { x: number; y: number; width: number; height: number }[],
+  available: ReadonlySet<number>,
+  viewportTop: number,
+  viewportBottom: number,
+): number {
+  let best = -1;
+  placements.forEach((p, i) => {
+    if (!available.has(i) || p.y + p.height <= viewportTop || p.y >= viewportBottom) return;
+    const chosen = best < 0 ? undefined : placements[best];
+    const top = Math.max(p.y, viewportTop);
+    const chosenTop = chosen ? Math.max(chosen.y, viewportTop) : Infinity;
+    if (!chosen || top < chosenTop || (top === chosenTop && p.x < chosen.x)) best = i;
+  });
+  return best;
+}
+
 export function MasonryGrid(props: MasonryGridProps) {
   const { tiles, opts, onOpen, actions, onAction, onHide, armed, onExit, onCollapse, keyboardActive } = props;
   const gridRef = useRef<HTMLDivElement>(null);
@@ -126,27 +144,15 @@ export function MasonryGrid(props: MasonryGridProps) {
 
   const selectedIndex = selectedKey === null ? -1 : tiles.findIndex((t) => t.key === selectedKey);
 
-  /** 未選択なら、今の画面中央に最も近いタイルから始める。 */
+  /** 未選択なら、今見えているタイルのうち左上にあるものから始める。 */
   const initialIndex = useCallback(() => {
     const wall = gridRef.current?.getBoundingClientRect().top ?? 0;
-    const target = window.innerHeight / 2;
-    let best = -1;
-    let distance = Infinity;
-    for (const i of available) {
-      const p = placements[i];
-      if (!p) continue;
-      const d = Math.abs(wall + p.y + p.height / 2 - target);
-      if (d < distance) {
-        best = i;
-        distance = d;
-      }
-    }
-    return best;
+    return findTopLeftVisible(placements, available, -wall, window.innerHeight - wall);
   }, [available, placements]);
 
   useEffect(() => {
-    if (selectedKey !== null && selectedIndex < 0) setSelectedKey(null);
-  }, [selectedKey, selectedIndex]);
+    if (selectedKey !== null && (selectedIndex < 0 || !available.has(selectedIndex))) setSelectedKey(null);
+  }, [selectedKey, selectedIndex, available]);
 
   // 選んだタイルへフォーカスを移し、画面の外なら必要な分だけスクロールする。
   useEffect(() => {
@@ -154,7 +160,8 @@ export function MasonryGrid(props: MasonryGridProps) {
     const elements = gridRef.current?.querySelectorAll<HTMLElement>('[data-tile-key]');
     const el = elements ? [...elements].find((item) => item.dataset.tileKey === selectedKey) : undefined;
     el?.focus({ preventScroll: true });
-    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const reducedMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'nearest', inline: 'nearest' });
   }, [selectedKey]);
 
   useEffect(() => {
@@ -189,6 +196,18 @@ export function MasonryGrid(props: MasonryGridProps) {
         }
         const tweet = tiles[current]?.tweet;
         if (tweet) onAction(tweet, e.key === 'l' ? 'like' : 'bookmark');
+      } else if (e.key === 'm' && current >= 0) {
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        if (selectedIndex < 0) {
+          setSelectedKey(tiles[current]?.key ?? null);
+          e.preventDefault();
+          return;
+        }
+        const tweet = tiles[current]?.tweet;
+        if (tweet) onHide(tweet);
       } else {
         return;
       }
@@ -196,7 +215,7 @@ export function MasonryGrid(props: MasonryGridProps) {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [keyboardActive, selectedIndex, available, initialIndex, placements, tiles, onOpen, onAction]);
+  }, [keyboardActive, selectedIndex, available, initialIndex, placements, tiles, onOpen, onAction, onHide]);
 
   // スクロールを見る場所はここ 1 つ。掃く合図と、穴を畳む合図の両方をここで出す。
   //

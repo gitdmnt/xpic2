@@ -64,7 +64,7 @@ function badges(media: Media, groupCount: number): Badge[] {
 const TILE =
   'group @container absolute top-0 left-0 flex cursor-zoom-in flex-col overflow-hidden rounded-md border border-line bg-elev' +
   ' transition-[transform,width,height,opacity] duration-280 ease-tile will-change-transform animate-pop hover:border-line-strong' +
-  ' motion-reduce:animate-none motion-reduce:transition-none';
+  ' motion-reduce:animate-none motion-reduce:transition-none scroll-my-16';
 
 export const Tile = memo(function Tile({
   tileKey,

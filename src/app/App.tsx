@@ -291,6 +291,14 @@ export function App() {
         setShortcutsOpen((open) => !open);
         return;
       }
+      if (e.key === 'r') {
+        // モーダルやライトボックスの背後では、壁の読み直しを始めない。
+        if (settingsOpen || shortcutsOpen || lightboxIndex >= 0) return;
+        e.preventDefault();
+        if (e.repeat) return;
+        reload();
+        return;
+      }
       if (e.key !== '/') return;
       // モーダルやライトボックスの背後にある入力へフォーカスを飛ばさない。
       if (settingsOpen || shortcutsOpen || lightboxIndex >= 0) return;
@@ -300,7 +308,7 @@ export function App() {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [settingsOpen, shortcutsOpen, lightboxIndex]);
+  }, [settingsOpen, shortcutsOpen, lightboxIndex, reload]);
 
   // ── 操作 ─────────────────────────────────────────────────────
   const handleSourceChange = useCallback((next: Source) => {
