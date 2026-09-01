@@ -12,14 +12,14 @@ import type { TweetActionState } from './useTweetActions.ts';
 const NO_IDS: ReadonlySet<string> = new Set();
 
 /**
- * この画面で拾ったか。取得した時点で付いていた印は数えない（読み込んだ端から消えてしまう）。
- * 返事待ちも数えない。楽観更新の印は失敗すれば戻るので、待たずに数えると、
+ * いいねかブックマークが付いているか。取得時点で付いていた印も数える。
+ * 返事待ちは数えない。楽観更新の印は失敗すれば戻るので、待たずに数えると、
  * 画面の外へ出た後で失敗した投稿まで外したままになる。
  */
-function picked(tweet: Tweet, state: TweetActionState): boolean {
+function marked(state: TweetActionState): boolean {
   return (
-    (state.viewer.liked && !tweet.viewer.liked && !state.pending.includes('like')) ||
-    (state.viewer.bookmarked && !tweet.viewer.bookmarked && !state.pending.includes('bookmark'))
+    (state.viewer.liked && !state.pending.includes('like')) ||
+    (state.viewer.bookmarked && !state.pending.includes('bookmark'))
   );
 }
 
@@ -40,7 +40,7 @@ export function useSweep(
     const ids = new Set<string>();
     for (const tweet of tweets) {
       const state = actions.get(tweet.id);
-      if (state && picked(tweet, state) && !phase.has(tweet.id)) ids.add(tweet.id);
+      if (state && marked(state) && !phase.has(tweet.id)) ids.add(tweet.id);
     }
     return ids;
   }, [tweets, actions, enabled, phase]);
