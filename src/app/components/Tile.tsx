@@ -16,7 +16,7 @@ interface TileProps {
   tileKey: string;
   tweet: Tweet;
   media: Media;
-  groupCount: number;
+  group: Media[];
   placement: Placement;
   showMeta: boolean;
   blurred: boolean;
@@ -57,7 +57,7 @@ function badges(media: Media, groupCount: number): Badge[] {
 
 // 触れたときに動くのは囲みだけ。写真の明るさは変えない（見えているものが変わってしまう）。
 //
-// group は写真に重ねる操作ボタンの出し入れ、@container はメタ行の数字の出し入れが見る先。
+// group は写真に重ねる操作ボタンの出し入れ、横並び表示、@container はメタ行の数字の出し入れが見る先。
 //
 // animate-pop を要素へ直に当てられるのは、生成の時点で最終位置の transform がインラインで入り、
 // 原点からの飛び込みが起きないため。既存タイルが動くときは transition だけが効く。
@@ -70,7 +70,7 @@ export const Tile = memo(function Tile({
   tileKey,
   tweet,
   media,
-  groupCount,
+  group,
   placement,
   showMeta,
   blurred,
@@ -119,9 +119,9 @@ export const Tile = memo(function Tile({
     }
   }, [playing]);
 
-  const badgeList = badges(media, groupCount);
+  const badgeList = badges(media, group.length);
   // ぼかしは写真だけに掛ける。囲みまでぼかすとタイルの縁が滲む。
-  const pic = `block size-full bg-sunk object-cover${blurred ? ' scale-110 blur-[24px] saturate-[.6]' : ''}`;
+  const pic = `block h-full bg-sunk object-cover${blurred ? ' scale-110 blur-[24px] saturate-[.6]' : ''}`;
 
   return (
     <article
@@ -147,29 +147,54 @@ export const Tile = memo(function Tile({
         className="relative min-h-0 w-full flex-auto overflow-hidden bg-sunk"
         style={{ height: `${placement.height - footer}px` }}
       >
-        <img
-          className={pic}
-          loading="lazy"
-          decoding="async"
-          alt={media.alt ?? tweet.text.slice(0, 80)}
-          src={fallback ? media.url : mediaUrl(media.url, 'medium')}
-          style={playing ? { display: 'none' } : undefined}
-          onError={() => {
-            // 素の URL でも失敗したら再設定しない（無限ループ防止）。
-            if (!fallback) setFallback(true);
-          }}
-        />
-        {hasVideo && (
-          <video
-            ref={videoRef}
-            className={pic}
-            src={media.video ?? undefined}
-            muted
-            loop
-            playsInline
-            preload="none"
-            style={playing ? undefined : { display: 'none' }}
-          />
+        {group.length > 1 ? (
+          <div className="flex size-full">
+            {group.map((item) => {
+              const aspect = Math.min(3, Math.max(0.42, (item.width || 1) / (item.height || 1)));
+              return (
+                <img
+                  key={item.key}
+                  className={`${pic} min-w-0`}
+                  loading="lazy"
+                  decoding="async"
+                  alt={item.alt ?? tweet.text.slice(0, 80)}
+                  src={fallback ? item.url : mediaUrl(item.url, 'medium')}
+                  style={{ flex: `${aspect} 1 0%` }}
+                  onError={() => {
+                    // 素の URL でも失敗したら再設定しない（無限ループ防止）。
+                    if (!fallback) setFallback(true);
+                  }}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            <img
+              className={`${pic} w-full`}
+              loading="lazy"
+              decoding="async"
+              alt={media.alt ?? tweet.text.slice(0, 80)}
+              src={fallback ? media.url : mediaUrl(media.url, 'medium')}
+              style={playing ? { display: 'none' } : undefined}
+              onError={() => {
+                // 素の URL でも失敗したら再設定しない（無限ループ防止）。
+                if (!fallback) setFallback(true);
+              }}
+            />
+            {hasVideo && (
+              <video
+                ref={videoRef}
+                className={`${pic} w-full`}
+                src={media.video ?? undefined}
+                muted
+                loop
+                playsInline
+                preload="none"
+                style={playing ? undefined : { display: 'none' }}
+              />
+            )}
+          </>
         )}
         {badgeList.length > 0 && (
           <div className="absolute top-2 right-2 flex gap-1 text-2xs tracking-[.02em]">

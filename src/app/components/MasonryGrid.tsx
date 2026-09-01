@@ -60,6 +60,11 @@ function aspectOf(media: Media): number {
   return Math.min(3, Math.max(0.42, w / h));
 }
 
+/** 横一列に束ねるタイルは、各画像の横幅を足した縦横比にする。 */
+function aspectOfGroup(group: readonly Media[]): number {
+  return group.reduce((sum, media) => sum + aspectOf(media), 0);
+}
+
 type Direction = 'left' | 'right' | 'up' | 'down';
 
 /** 指定方向にあるタイルから、進行方向と横ずれの合計が最小のものを選ぶ。 */
@@ -115,7 +120,7 @@ export function MasonryGrid(props: MasonryGridProps) {
   const containerWidth = useElementWidth(gridRef);
 
   // useMasonry の再計算を tiles の変化だけに縛るため、配列の同一性を保つ。
-  const aspects = useMemo(() => tiles.map((t) => aspectOf(t.media)), [tiles]);
+  const aspects = useMemo(() => tiles.map((t) => aspectOfGroup(t.group)), [tiles]);
 
   const { placements, height } = useMasonry({
     aspects,
@@ -343,7 +348,7 @@ export function MasonryGrid(props: MasonryGridProps) {
               tileKey={t.key}
               tweet={t.tweet}
               media={t.media}
-              groupCount={t.group.length}
+              group={t.group}
               placement={placement}
               showMeta={opts.meta}
               blurred={opts.blur && t.tweet.sensitive}
