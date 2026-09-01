@@ -78,6 +78,21 @@ function trapTab(e: KeyboardEvent, root: HTMLElement): void {
   }
 }
 
+/** 墨地に浮かせる的。地も罫も持たせず、触れたときだけ罫と同じ薄い白を敷く。 */
+const LB_BTN = 'btn btn-ghost absolute z-2 p-0 text-lb-fg hover:bg-lb-line hover:text-lb-fg';
+
+/** 送り矢印。上下中央に置き、狭い画面では一回り小さくする。 */
+const LB_NAV = `${LB_BTN} top-1/2 h-16 w-11 -translate-y-1/2 max-sm:h-14 max-sm:w-9`;
+
+/** 舞台に載る写真と動画。 */
+const STAGE_MEDIA = 'max-h-full max-w-full rounded-sm object-contain';
+
+/**
+ * 下の束に並ぶアイコン 1 つ。字が消えて 15px になったので、余白が無いと 15px 角の的しか残らない。
+ * ここで 31px 角まで広げ、上下は margin で戻して、隣に並ぶ閲覧数や寸法の行を厚くしない。
+ */
+const LB_LINK = 'inline-flex items-center -my-2 p-2 text-lb-dim hover:text-lb-fg hover:underline';
+
 export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actions, onAction }: LightboxProps) {
   const entry = index >= 0 ? list[index] : undefined;
   const visible = entry !== undefined;
@@ -173,23 +188,44 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
   };
 
   return (
-    <div className="lightbox" ref={rootRef} role="dialog" aria-modal="true" onClick={closeOnSelf}>
-      {/* 記号の文字（✕ ‹ ›）は字体次第で大きさも重心も揃わないので、アイコンに寄せる。 */}
-      {/* .icon-btn は付けない。あちらのホバー色は生成り地向けで、墨地のここでは字が地に沈む。 */}
-      <button ref={closeRef} className="lb-close" aria-label="閉じる" onClick={onClose}>
+    // ここだけ墨地にする。周りを沈めないと写真の明暗が正しく見えない。
+    // 輪郭の藍鼠は墨地の上で沈むので、この器の中だけ地の色で描く。
+    <div
+      className="fixed inset-0 z-70 grid grid-rows-[1fr_auto] bg-lb-bg text-lb-fg [&_:focus-visible]:outline-lb-fg"
+      ref={rootRef}
+      role="dialog"
+      aria-modal="true"
+      onClick={closeOnSelf}
+    >
+      {/* 記号の文字（✕ ‹ ›）は字体次第で大きさも重心も揃わないので、アイコンに寄せる。
+          囲みは持たせない。狭い画面では舞台の余白が縮む一方でボタンの位置は据え置きなので、
+          枠があると写真の上に線が乗る。墨地の lb-fg のアイコンだけで十分読め、
+          押せることはホバーの地が伝える。その地は罫と同じ薄い白で、墨地から 1 段だけ持ち上げる。 */}
+      <button
+        ref={closeRef}
+        className={`${LB_BTN} top-4 right-4 size-9`}
+        aria-label="閉じる"
+        onClick={onClose}
+      >
         <Icon name="close" />
       </button>
-      <button className="lb-nav prev" aria-label="前へ" onClick={() => move(-1)}>
-        <Icon name="prev" />
+      {/* 送り矢印は押す的の大きさが要るので、アイコンだけ 20px にする。 */}
+      <button className={`${LB_NAV} left-3`} aria-label="前へ" onClick={() => move(-1)}>
+        <Icon name="prev" size="lg" />
       </button>
-      <button className="lb-nav next" aria-label="次へ" onClick={() => move(1)}>
-        <Icon name="next" />
+      <button className={`${LB_NAV} right-3`} aria-label="次へ" onClick={() => move(1)}>
+        <Icon name="next" size="lg" />
       </button>
 
-      <figure className="lb-stage" onClick={closeOnSelf}>
+      <figure
+        className="flex min-h-0 items-center justify-center px-16 pt-6 pb-2 max-sm:px-2 max-sm:pt-4 max-sm:pb-1"
+        onClick={closeOnSelf}
+      >
+        {/* 墨地の上では影が働かないので付けない。角丸も写真の縁を削らない程度に留める。 */}
         {isMovie ? (
           <video
             key={stageKey}
+            className={STAGE_MEDIA}
             ref={videoRef}
             src={media.video ?? undefined}
             poster={large}
@@ -201,6 +237,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
         ) : (
           <img
             key={stageKey}
+            className={STAGE_MEDIA}
             src={large}
             alt={media.alt ?? ''}
             onError={(e) => {
@@ -212,18 +249,21 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
         )}
       </figure>
 
-      <figcaption className="lb-info">
-        <img className="av" src={tweet.user.avatar} alt="" />
-        <div className="lb-body">
+      <figcaption className="mx-auto flex w-full max-w-[1000px] items-start gap-3 px-6 pt-3 pb-6 text-sm text-lb-dim max-sm:px-4 max-sm:pb-4">
+        <img className="size-9 shrink-0 rounded-full" src={tweet.user.avatar} alt="" />
+        {/* 長い本文で flex アイテムが縮まないと省略が効かないので min-w-0 が要る。 */}
+        <div className="min-w-0 flex-1">
           <div>
-            <span className="who">{tweet.user.name}</span>{' '}
-            <span className="handle">
+            <span className="font-semibold text-lb-fg">{tweet.user.name}</span>{' '}
+            <span className="font-normal text-lb-dim">
               @{tweet.user.screenName} · {relTime(tweet.createdAt)}
               {tweet.retweetedBy ? ` · @${tweet.retweetedBy.screenName} がリポスト` : ''}
             </span>
           </div>
-          {tweet.text ? <div className="txt">{tweet.text}</div> : null}
-          <div className="row">
+          {tweet.text ? (
+            <div className="mt-1 mb-2 break-words whitespace-pre-wrap text-lb-fg">{tweet.text}</div>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
             {/* 共有（URL のコピー）は下のリンク束ではなく操作ボタンの並びに置く。
                 あちらは「この画像をどう開くか」で、コピーの対象はポストだから。 */}
             <ActionBar
@@ -232,9 +272,10 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
               onAction={onAction}
               counts="all"
               share
-              className="lb-actions"
+              variant="lightbox"
             />
-            <div className="lb-links">
+            {/* 下の束の gap は、字を持つ閲覧数・寸法・件数との間隔。 */}
+            <div className="flex flex-wrap items-center gap-4">
               {/* アイコンは aria-hidden なので、数だけでは何の数か伝わらない。 */}
               {tweet.stats.views ? (
                 <span role="img" aria-label={`閲覧数 ${compact(tweet.stats.views)}`}>
@@ -246,39 +287,44 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
               </span>
               {/* 3 つとも字を落としてアイコンだけにした。Icon は aria-hidden なので、
                   aria-label が無いとリンクもボタンも無名になる。落とした語はそのまま
-                  aria-label と title に移してあり、読み上げとホバーでは今までどおり出る。 */}
-              <a
-                className="lb-link"
-                href={tweet.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                aria-label="X で開く"
-                title="X で開く"
-              >
-                <Icon name="external" />
-              </a>
-              <a
-                className="lb-link"
-                href={orig}
-                target="_blank"
-                rel="noreferrer noopener"
-                aria-label="原寸"
-                title="原寸"
-              >
-                <Icon name="expand" />
-              </a>
-              {/* サーバ版は中継してファイル名を付けていた。拡張機能では downloads API がそれをやる。 */}
-              <button
-                type="button"
-                className="aslink lb-link"
-                aria-label="保存"
-                title="保存"
-                onClick={() => void save(saveUrl)}
-              >
-                <Icon name="download" />
-              </button>
-              {/* 墨地なので生成り向けの --fg-faint では読めない。色はクラスへ預けて styles.css に決めさせる。 */}
-              <span className="lb-index">
+                  aria-label と title に移してあり、読み上げとホバーでは今までどおり出る。
+                  的を広げたぶん、アイコンどうしは隙間 0 の束にする。離れたままだと 3 つが
+                  ひと束に見えず、押せる範囲も判らない。 */}
+              <div className="flex items-center">
+                <a
+                  className={LB_LINK}
+                  href={tweet.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="X で開く"
+                  title="X で開く"
+                >
+                  <Icon name="external" />
+                </a>
+                <a
+                  className={LB_LINK}
+                  href={orig}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="原寸"
+                  title="原寸"
+                >
+                  <Icon name="expand" />
+                </a>
+                {/* サーバ版は中継してファイル名を付けていた。拡張機能では downloads API がそれをやる。
+                    ダウンロード API を呼ぶので button だが、隣の 2 つと並ぶので見た目はリンクに揃える。 */}
+                <button
+                  type="button"
+                  className={`${LB_LINK} cursor-pointer`}
+                  aria-label="保存"
+                  title="保存"
+                  onClick={() => void save(saveUrl)}
+                >
+                  <Icon name="download" />
+                </button>
+              </div>
+              {/* 「1 / 240」。送るたびに桁が変わるので、等幅数字にして左右の揺れを止める。 */}
+              <span className="text-lb-dim tabular-nums">
                 {index + 1} / {list.length}
               </span>
             </div>

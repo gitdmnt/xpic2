@@ -38,13 +38,36 @@ interface Message {
 /** 列数の選択肢。0 は「自動」で、画面の幅から決める。 */
 const COLUMNS: readonly number[] = [0, 2, 3, 4, 5, 6, 7, 8];
 
+/**
+ * 「拾ったら消す」のつまみ。1〜30 秒を刻み 1 で送り、その先の 1 目盛りを切に充てる。
+ * 猶予が伸びていった先が「もう消さない」なので、切は左端ではなく右端に置く。
+ * 保存する値は Options.sweep のまま（0 が切）で、つまみの位置との読み替えはここが持つ。
+ */
+const SWEEP_MAX = 30;
+const SWEEP_OFF = SWEEP_MAX + 1;
+
+/** つまみの位置 → 保存する秒数。 */
+function toSweep(pos: number): number {
+  return pos >= SWEEP_OFF ? 0 : pos;
+}
+
+/** 保存する秒数 → つまみの位置。 */
+function toPos(sweep: number): number {
+  return sweep === 0 ? SWEEP_OFF : sweep;
+}
+
+/** 目盛りの読み。字にも読み上げにも同じものを出す。 */
+function sweepLabel(sweep: number): string {
+  return sweep === 0 ? '切' : `${sweep}秒`;
+}
+
 /** Tab で辿れる要素。details が閉じているときの中身まで拾うので、見えているものへ後で絞る。 */
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 /**
  * Tab をシートの中で巡回させる。
- * 覆いの裏には `.tile-actions` が数百個あり（`opacity: 0` でもフォーカスは当たる）、
+ * 覆いの裏には写真に重ねた操作ボタンが数百個あり（透明でもフォーカスは当たる）、
  * 外へ逃がすとシートへ戻るまでに Tab を何百回も押すことになる。
  */
 function trapTab(e: KeyboardEvent, root: HTMLElement): void {
@@ -86,9 +109,10 @@ function Check({ label, title, checked, onToggle }: CheckProps) {
   // label と input の両方に置くのは、行のどこに乗せてもツールチップを出しつつ、
   // 読み上げには input 自身の title を説明として拾わせるため。
   return (
-    <label className="chk" title={title}>
+    <label className="inline-flex cursor-pointer items-center gap-2 select-none" title={title}>
       <input
         type="checkbox"
+        className="m-0 size-[15px] shrink-0 accent-accent"
         title={title}
         checked={checked}
         onChange={(e) => onToggle(e.currentTarget.checked)}
@@ -97,6 +121,21 @@ function Check({ label, title, checked, onToggle }: CheckProps) {
     </label>
   );
 }
+
+/** タブ 1 枚分の中身。小見出しどうしの間はここで一律に決め、各節には持たせない。 */
+const PANEL = 'grid gap-6';
+
+/** 節の小見出し。 */
+const OPT_TITLE = 'mb-2 text-xs font-semibold tracking-[.04em] text-fg-dim';
+
+/** 選択肢の並び。狭い画面では折り返させる。 */
+const OPT_LIST = 'flex flex-wrap gap-x-4 gap-y-2';
+
+/** 添え物の一行。 */
+const LEDE = 'text-sm text-fg-dim';
+
+/** シートの中に置くボタンの並び。ActionBar とは別物なので、間隔もこちらで決める。 */
+const ROW = 'flex flex-wrap items-center gap-3';
 
 export function SettingsModal({
   open,
@@ -212,15 +251,16 @@ export function SettingsModal({
   const ops = Object.entries(status?.queryIds ?? {});
 
   return (
+    // 覆いは墨を薄く流すだけにする。背後の生成りが透けて見えるほうが、戻る先が分かる。
     <div
-      className="modal"
+      className="fixed inset-0 z-60 flex items-start justify-center overflow-auto bg-scrim px-4 py-[6vh]"
       // オーバーレイ自身をクリックしたときだけ閉じる（シート内の操作で閉じない）
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="sheet"
+        className="relative w-[min(760px,100%)] rounded-md border border-line bg-elev p-6 shadow-sheet max-sm:p-4"
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
@@ -228,13 +268,25 @@ export function SettingsModal({
         // 開いた直後の行き先。中の操作子ではなくシート自身に落として、見出しから読ませる。
         tabIndex={-1}
       >
+        {/*
+          header 自身に並べ方（flex や justify-content）は持たせない。h2 は読み上げ専用で、
+          閉じるは角へ浮かせてあるから、流れの中に並べる相手がひとつも残っていない。
+          余白も持たせない。持たせると ✕ だけの帯とタブの帯が二重に積まれる。
+          浮かせる位置がシートの内側余白と同じ値なのは、タブの行と背丈を揃えるため。
+        */}
         <header>
           {/*
             見出しは目には出さない。開いている面はタブが示しているので、字にすると重なる。
             要素ごと消せないのは、シートの aria-labelledby がこの id を指しているためである。
           */}
           <h2 id="settings-title" className="sr-only">設定</h2>
-          <button type="button" className="icon-btn" aria-label="閉じる" title="閉じる" onClick={onClose}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon absolute top-6 right-6 max-sm:top-4 max-sm:right-4"
+            aria-label="閉じる"
+            title="閉じる"
+            onClick={onClose}
+          >
             <Icon name="close" />
           </button>
         </header>
@@ -245,11 +297,12 @@ export function SettingsModal({
 
           字は落としてアイコンだけにした。Icon は aria-hidden なので、そのままではボタンが無名になる。
           落とした語は aria-label と title の両方へ移す。
+          見た目はヘッダのタブと共有する。同じ役目のものに 2 つの流儀を作らない。
         */}
-        <nav className="sheet-tabs">
+        <nav className="mb-6 flex flex-wrap gap-1">
           <button
             type="button"
-            className={tab === 'display' ? 'sheet-tab on' : 'sheet-tab'}
+            className={`btn btn-ghost btn-icon${tab === 'display' ? ' btn-on' : ''}`}
             aria-pressed={tab === 'display'}
             aria-label="表示"
             title="表示"
@@ -259,7 +312,7 @@ export function SettingsModal({
           </button>
           <button
             type="button"
-            className={tab === 'connection' ? 'sheet-tab on' : 'sheet-tab'}
+            className={`btn btn-ghost btn-icon${tab === 'connection' ? ' btn-on' : ''}`}
             aria-pressed={tab === 'connection'}
             aria-label="接続"
             title="接続"
@@ -270,17 +323,23 @@ export function SettingsModal({
         </nav>
 
         {tab === 'display' ? (
-          <div className="panel">
-            <div className="opt-group">
-              <h3 className="opt-title" id="opt-columns">列数</h3>
+          <div className={PANEL}>
+            <div>
+              <h3 className={OPT_TITLE} id="opt-columns">列数</h3>
               {/* 「自動」の説明文は置かない。選択肢の先頭にその語が出ている以上、言い直しにしかならない。 */}
               {/* ボタン単位で移動する読み上げでは「2」だけが読まれるので、群に小見出しの名前を与える。 */}
-              <div className="seg" role="group" aria-labelledby="opt-columns">
+              {/* 段組みの数だけ横に並ぶので、狭い画面では折り返させる。
+                  罫で継いだ一体の帯にすると、折り返した瞬間に継ぎ目が破綻する。 */}
+              <div className="flex flex-wrap gap-1" role="group" aria-labelledby="opt-columns">
                 {COLUMNS.map((n) => (
+                  // 選んだ状態の見せ方はタブに倣う。ここだけ罫を差し色にすると、
+                  // 同じシートの中で列数セグメントがいちばん濃い図形になる。
+                  // 塗りをタブほど濃くしないのは、こちらには「自動」「3」という字が残っているためで、
+                  // 選択は字色が先に伝える。塗りは念押しでよい。
                   <button
                     key={n}
                     type="button"
-                    className={opts.columns === n ? 'seg-btn on' : 'seg-btn'}
+                    className={`btn min-w-11 text-sm tabular-nums${opts.columns === n ? ' btn-on-weak' : ''}`}
                     aria-pressed={opts.columns === n}
                     onClick={() => onOptsChange({ columns: n })}
                   >
@@ -290,10 +349,10 @@ export function SettingsModal({
               </div>
             </div>
 
-            <div className="opt-group">
-              <h3 className="opt-title" id="opt-filter">絞り込み</h3>
+            <div>
+              <h3 className={OPT_TITLE} id="opt-filter">絞り込み</h3>
               {/* 「RT」は語だけでは立たない。何の絞り込みかは小見出しが持っている。 */}
-              <div className="opt-list" role="group" aria-labelledby="opt-filter">
+              <div className={OPT_LIST} role="group" aria-labelledby="opt-filter">
                 <Check label="画像" checked={opts.photos} onToggle={(v) => onOptsChange({ photos: v })} />
                 <Check label="動画" checked={opts.videos} onToggle={(v) => onOptsChange({ videos: v })} />
                 <Check label="GIF" checked={opts.gifs} onToggle={(v) => onOptsChange({ gifs: v })} />
@@ -301,9 +360,9 @@ export function SettingsModal({
               </div>
             </div>
 
-            <div className="opt-group">
-              <h3 className="opt-title" id="opt-look">見せ方</h3>
-              <div className="opt-list" role="group" aria-labelledby="opt-look">
+            <div>
+              <h3 className={OPT_TITLE} id="opt-look">見せ方</h3>
+              <div className={OPT_LIST} role="group" aria-labelledby="opt-look">
                 <Check
                   label="情報"
                   title="投稿者といいね数をタイルに出す"
@@ -324,52 +383,89 @@ export function SettingsModal({
                 />
               </div>
             </div>
+
+            <div>
+              {/* 入り切りと長さを 1 列に畳んである。切ったときに秒数のボタンだけが宙に浮かず、
+                  選び直せば前の長さがそのまま戻る。列数の「自動」と同じ作りである。
+                  ここだけ添え物の一行を許すのは、掛かる先も、秒数が何の長さなのかも、
+                  数字の並びからは読み取れないためで、他の節と違って言わずには成立しない。 */}
+              <h3 className={OPT_TITLE} id="opt-sweep">拾ったら消す</h3>
+              {/* 右端が切であることは、そこまで送らないと判らない。一言だけ添えておく。 */}
+              <p id="opt-sweep-note" className={`${LEDE} mb-2`}>
+                おすすめ・フォロー中で、いいねかブックマークを付けた投稿を壁から外すまでの猶予。
+                取り消せば残ります。右端まで送ると切。
+              </p>
+              <div className="flex items-center gap-3">
+                {/* 小見出しだけでは「10秒」が何の 10 秒か伝わらないので、説明も名前に添える。
+                    読み上げは既定では位置の数（31）を読むので、字と同じ語を aria-valuetext で被せる。
+                    つまみの背丈を 32px にするのは、シートに並ぶ他の押せるものと揃えるため。 */}
+                <input
+                  type="range"
+                  className="h-8 max-w-80 flex-1 cursor-pointer accent-accent"
+                  min={1}
+                  max={SWEEP_OFF}
+                  step={1}
+                  value={toPos(opts.sweep)}
+                  aria-labelledby="opt-sweep"
+                  aria-describedby="opt-sweep-note"
+                  aria-valuetext={sweepLabel(opts.sweep)}
+                  onChange={(e) => onOptsChange({ sweep: toSweep(Number(e.currentTarget.value)) })}
+                />
+                {/* 送るたびに桁が変わるので、等幅数字と固定幅で左右の揺れを止める。
+                    読み上げには input 自身が同じ語を持っているので、こちらは目だけに出す。 */}
+                <span className="w-10 shrink-0 text-sm text-fg-dim tabular-nums" aria-hidden="true">
+                  {sweepLabel(opts.sweep)}
+                </span>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="panel">
+          <div className={PANEL}>
             {/* 「cookie を貼る必要はない」は書かない。貼る欄がどこにも無いので、疑う人がいない。 */}
-            <p className="lede">ブラウザの x.com のセッションをそのまま使います。</p>
+            <p className={LEDE}>ブラウザの x.com のセッションをそのまま使います。</p>
 
             {/*
-              「あり／なし」の語は、色（.ok / .ng）と 1 字の印に預ける。
+              「あり／なし」の語は、色と 1 字の印に預ける。
               印は aria-hidden にし、代わりに同じ語を sr-only で置く。字を減らしても読み上げは変わらない。
-              上書きの 2 行に色を振らないのは、0 件が異常ではないからである。ここを .ng にすると
+              上書きの 2 行に色を振らないのは、0 件が異常ではないからである。ここを赤にすると
               既定値だけで正しく動いている状態が赤く見え、権限とログインの赤の意味まで薄まる。
             */}
-            <div className="statusbox">
+            <div className="rounded-md border border-line bg-sunk p-3 font-mono text-xs whitespace-pre-wrap text-fg-dim">
               <div
-                className={status?.granted ? 'ok' : 'ng'}
+                className={status?.granted ? 'text-repost' : 'text-danger'}
                 title={status?.granted ? 'x.com への権限: あり' : 'x.com への権限: なし'}
               >
                 権限 <span aria-hidden="true">{status?.granted ? '✓' : '—'}</span>
                 <span className="sr-only">{status?.granted ? 'あり' : 'なし'}</span>
               </div>
               <div
-                className={status?.loggedIn ? 'ok' : 'ng'}
+                className={status?.loggedIn ? 'text-repost' : 'text-danger'}
                 title={status?.loggedIn ? 'x.com のログイン: あり' : 'x.com のログイン: なし'}
               >
                 ログイン <span aria-hidden="true">{status?.loggedIn ? '✓' : '—'}</span>
                 <span className="sr-only">{status?.loggedIn ? 'あり' : 'なし'}</span>
               </div>
               <div>queryId の上書き {ops.length}</div>
-              {/* queryId の値は目で照合するためのものなので、ここだけは省略しない。 */}
+              {/* queryId の値は目で照合するためのものなので、ここだけは省略しない。
+                  fg-faint の 4.6:1 はページ地に対する値で、沈めた地の上では 4.26:1 まで落ちる。
+                  この面に置く本文サイズの字は 1 段濃い fg-dim にする（この箱の既定色がそれ）。 */}
               {ops.map(([op, id]) => (
-                <div key={op} className="sub">
+                <div key={op} className="pl-[1.2em]">
                   {op}: {id}
                 </div>
               ))}
               <div>features の上書き {status?.featureCount ?? 0}</div>
             </div>
 
-            <div className="actions">
+            <div className={ROW}>
               {status && !status.granted && (
-                <button type="button" className="primary" onClick={() => void handleGrant()} disabled={busy}>
+                <button type="button" className="btn btn-primary" onClick={() => void handleGrant()} disabled={busy}>
                   権限を許可
                 </button>
               )}
               {status && status.granted && !status.loggedIn && (
                 <a
-                  className="msg"
+                  className="text-sm text-accent"
                   href="https://x.com/login"
                   target="_blank"
                   rel="noreferrer noopener"
@@ -378,36 +474,37 @@ export function SettingsModal({
                   ログイン
                 </a>
               )}
-              {msg && <span className={msg.bad ? 'msg bad' : 'msg'}>{msg.text}</span>}
+              {msg && <span className={msg.bad ? 'text-sm text-danger' : 'text-sm text-accent'}>{msg.text}</span>}
             </div>
 
             <details>
-              <summary>queryId を手で入れる</summary>
+              <summary className="cursor-pointer text-sm text-fg-dim">queryId を手で入れる</summary>
               {/*
                 自動で追いかける仕組みと、それが届かない条件の説明は落とした。
                 この欄を開く人は自動で拾えなかったところに来ているので、経緯はもう分かっている。
                 手順と、何を読み取るかの 2 点だけ残す。
               */}
-              <p className="lede">
+              <p className={LEDE}>
                 DevTools の <b>Network</b> で該当のリクエストを <b>Copy as cURL</b> して貼り付けてください。
                 読み取るのは queryId と features だけです。
               </p>
-              <label className="field">
-                <span>cURL を貼り付け</span>
+              <label className="my-4 block">
+                <span className="mb-1 block text-xs text-fg-dim">cURL を貼り付け</span>
                 <textarea
+                  className="w-full resize-y rounded-sm border border-line-input bg-sunk px-3 py-2 font-mono text-xs leading-normal"
                   rows={5}
                   value={curl}
                   onChange={(e) => setCurl(e.currentTarget.value)}
                   placeholder="curl 'https://x.com/i/api/graphql/xxxx/FavoriteTweet' ..."
                 />
               </label>
-              <div className="actions">
-                <button type="button" onClick={() => void handleCurl()} disabled={busy}>
+              <div className={ROW}>
+                <button type="button" className="btn" onClick={() => void handleCurl()} disabled={busy}>
                   取り込む
                 </button>
                 <button
                   type="button"
-                  className="ghost"
+                  className="btn btn-ghost"
                   title="queryId と features の上書きを全部消す"
                   onClick={() => void handleClear()}
                   disabled={busy}
@@ -419,7 +516,7 @@ export function SettingsModal({
 
             {/* レート制限と仕様変更の注意は落とした。非公開 API を使う以上いつでも当てはまる一般論で、
                 画面に常時出しておく理由が無い。保存しないという約束のほうは、ここでしか言えない。 */}
-            <p className="fine">保存するのは queryId と features の上書きだけで、認証情報は保存しません。</p>
+            <p className="text-xs text-fg-faint">保存するのは queryId と features の上書きだけで、認証情報は保存しません。</p>
           </div>
         )}
       </div>

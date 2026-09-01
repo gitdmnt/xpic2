@@ -111,6 +111,12 @@ export interface Options {
   meta: boolean;
   blur: boolean;
   split: boolean;
+  /**
+   * 拾った投稿を壁から外すまでの秒数。0 は切。
+   * 入り切りと長さを 1 つの数で持つのは、切っているあいだ秒数だけが宙に浮くのを避けるため。
+   * 掛かるのはおすすめとフォロー中だけで、自分で並びを決めて開いた画面には掛からない。
+   */
+  sweep: number;
 }
 
 export const DEFAULT_OPTIONS: Options = {
@@ -122,4 +128,5 @@ export const DEFAULT_OPTIONS: Options = {
   meta: true,
   blur: true,
   split: true,
+  sweep: 10,
 };

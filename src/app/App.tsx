@@ -10,6 +10,7 @@ import { extStatus, isReady } from './lib/x.ts';
 import { usePersistedState } from './hooks/usePersistedState.ts';
 import { useTimeline } from './hooks/useTimeline.ts';
 import { useTweetActions } from './hooks/useTweetActions.ts';
+import { useAutoDismiss } from './hooks/useAutoDismiss.ts';
 import { Icon } from './components/Icon.tsx';
 import { TopBar } from './components/TopBar.tsx';
 import { MasonryGrid } from './components/MasonryGrid.tsx';
@@ -131,6 +132,14 @@ export function App() {
     dismissError,
   } = useTweetActions(tweets);
 
+  // 拾った投稿を少し置いてから壁から外すのは、おすすめとフォロー中だけ。
+  // 自分で並びを決めて開いた画面（ユーザー・検索・ブックマーク）では、
+  // 見えているものが勝手に減るほうが困るので掃わない。
+  const sweeping = opts.sweep > 0 && (request.source === 'foryou' || request.source === 'following');
+  // 待ち時間を止める合図には lbIndex を使う。丸めた lightboxIndex は tiles から導くので、
+  // ここで見ると tiles → dismissed → tiles の輪になる。
+  const dismissed = useAutoDismiss(tweets, actions, sweeping && lbIndex < 0 ? opts.sweep * 1000 : 0);
+
   // ── タイルとライトボックスの導出 ─────────────────────────────
   // split が真なら 1 メディア 1 タイル、偽なら 1 投稿 1 タイル（group は投稿の全メディア）。
   // ライトボックスはタイル順に group を展開した並びなので、lbIndex はその先頭位置になる。
@@ -140,16 +149,18 @@ export function App() {
     const out: TileItem[] = [];
     let lb = 0;
     for (const tweet of tweets) {
+      const phase = sweeping ? dismissed.get(tweet.id) : undefined;
+      if (phase === 'gone') continue;
       const groups: Media[][] = opts.split ? tweet.media.map((m) => [m]) : [tweet.media];
       for (const group of groups) {
         const media = group[0];
         if (!media) continue;
-        out.push({ key: `${tweet.id}:${media.key}`, tweet, media, group, lbIndex: lb });
+        out.push({ key: `${tweet.id}:${media.key}`, tweet, media, group, lbIndex: lb, leaving: phase === 'leaving' });
         lb += group.length;
       }
     }
     return out;
-  }, [tweets, opts.split]);
+  }, [tweets, opts.split, sweeping, dismissed]);
 
   const entries = useMemo<LightboxEntry[]>(() => {
     const out: LightboxEntry[] = [];
@@ -204,10 +215,11 @@ export function App() {
 
   // ── 無限スクロール ───────────────────────────────────────────
   // 依存が変わるたびに張り直すことで、センチネルが視界に残ったままでも次の読み込みが続く。
-  const hasTiles = tiles.length > 0;
+  // 見るのはタイルではなく取得済みの投稿。拾って外したぶんで壁が空になっても、続きは読み続ける。
+  const hasTweets = tweets.length > 0;
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !enabled || loading || done || !hasTiles) return;
+    if (!el || !enabled || loading || done || !hasTweets) return;
     const io = new IntersectionObserver(
       (es) => {
         if (es.some((e) => e.isIntersecting)) loadMore();
@@ -216,7 +228,7 @@ export function App() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [enabled, loading, done, hasTiles, loadMore]);
+  }, [enabled, loading, done, hasTweets, loadMore]);
 
   // ── キーボード ───────────────────────────────────────────────
   useEffect(() => {
@@ -277,20 +289,21 @@ export function App() {
 
   // ── 状態表示 ─────────────────────────────────────────────────
   const status = (() => {
-    if (configError) return <div className="err"><Icon name="warning" /> {configError}</div>;
+    if (configError) return <div className="text-danger"><Icon name="warning" /> {configError}</div>;
     if (configured === false) return <>x.com への権限とログインが要ります</>;
     if (error) {
       return (
         <>
-          <div className="err"><Icon name="warning" /> {error.message}</div>
-          {error.hint ? <div className="hint">{error.hint}</div> : null}
+          <div className="text-danger"><Icon name="warning" /> {error.message}</div>
+          {error.hint ? <div className="mt-2 text-sm text-fg-faint">{error.hint}</div> : null}
         </>
       );
     }
     if (loading) {
       return (
         <>
-          <div className="spinner" />
+          {/* 待機の印は 20px の円 1 つ。動きを減らす設定では回さない。 */}
+          <div className="mx-auto size-5 animate-turn rounded-full border-2 border-line border-t-accent motion-reduce:animate-none" />
           {/* 回る図形は読み上げに何も残さないので、字は隠したまま持たせる */}
           <span className="sr-only">読み込み中</span>
         </>
@@ -302,7 +315,11 @@ export function App() {
     }
     if (done) {
       // 終端は罫 1 本で足りる。ただし 0 件のときは引く罫の上に何も無く、線だけでは伝わらない。
-      return tiles.length === 0 ? <>見つかりません</> : <hr className="end" />;
+      // 飾りではなく終いの印なので、罫 1 本ぶんの太さと、字より短い 40px に留める。
+      // line-strong なのは、1px の罫が 1 本だけ孤立して置かれ、他に手掛かりが無いため。
+      // ここで見るのはタイルではなく取得できた投稿。拾って壁から外したぶんで空になったときに
+      // 「見つかりません」と言うと、集まらなかったのか掃い終えたのかが逆に伝わる。
+      return tweets.length === 0 ? <>見つかりません</> : <hr className="mx-auto my-2 w-10 border-t border-line-strong" />;
     }
     return null;
   })();
@@ -322,10 +339,13 @@ export function App() {
         tweetCount={tweets.length}
       />
 
-      <main>
+      <main className="p-4 max-sm:p-3">
         <MasonryGrid tiles={tiles} opts={opts} onOpen={setLbIndex} actions={actions} onAction={handleAction} />
-        <div id="sentinel" ref={sentinelRef} />
-        <div className="status">{status}</div>
+        {/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */}
+        <div ref={sentinelRef} className="h-px" />
+        {/* 読み込み中に出るのは円 1 つだけなので、字の 1 行分を見込んだ余白では円が宙に浮く。
+            上下とも詰め、下だけ厚くする（頁の終いの余白をここが持つため）。 */}
+        <div className="px-4 pt-6 pb-10 text-center text-fg-dim">{status}</div>
       </main>
 
       <Lightbox
@@ -338,10 +358,14 @@ export function App() {
         onAction={handleAction}
       />
 
+      {/* 操作の失敗通知。ライトボックス (z-70) より前に出す。拡大表示中に押しても読めるようにするため。 */}
       {actionError ? (
-        <div className="toast" role="status">
+        <div
+          className="fixed bottom-4 left-1/2 z-80 flex max-w-[min(680px,calc(100%_-_32px))] -translate-x-1/2 items-center gap-3 rounded-md border border-line bg-elev py-2 pr-2 pl-4 text-sm text-danger shadow-float"
+          role="status"
+        >
           <span>{actionError}</span>
-          <button type="button" className="icon-btn" aria-label="閉じる" onClick={dismissError}>
+          <button type="button" className="btn btn-ghost btn-icon" aria-label="閉じる" onClick={dismissError}>
             <Icon name="close" />
           </button>
         </div>

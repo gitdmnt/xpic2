@@ -3,10 +3,10 @@
   "configurations": [
     {
       "name": "xpic2",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["server.ts"],
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "bun run build && exec python3 -m http.server 5173 --directory dist"],
       "port": 5173,
-      "autoPort": true
+      "autoPort": false
     }
   ]
 }

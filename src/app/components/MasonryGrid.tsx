@@ -11,6 +11,8 @@ export interface TileItem {
   media: Media;
   group: Media[];
   lbIndex: number;
+  /** 外れていく途中。薄くしながら場所を保ち、消えきってから tiles から外れる。 */
+  leaving: boolean;
 }
 
 interface MasonryGridProps {
@@ -59,7 +61,7 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction }: MasonryG
   );
 
   return (
-    <div className="grid" ref={gridRef} style={{ position: 'relative', height: `${height}px` }}>
+    <div className="relative w-full" ref={gridRef} style={{ height: `${height}px` }}>
       {/* 幅が測れるまでは配置が全て原点に潰れるので描かない。 */}
       {containerWidth > 0 &&
         tiles.map((t, i) => {
@@ -75,6 +77,7 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction }: MasonryG
               placement={placement}
               showMeta={opts.meta}
               blurred={opts.blur && t.tweet.sensitive}
+              leaving={t.leaving}
               onOpen={handler}
               action={actions.get(t.tweet.id)}
               onAction={onAction}

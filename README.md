@@ -97,6 +97,10 @@ x.com を普通に使っているうちに追いつくので、普段は何も�
 X への取得は [twitter-openapi-typescript](https://www.npmjs.com/package/twitter-openapi-typescript) に任せています。
 GraphQL のリクエスト組み立てとレスポンスの型付けはライブラリ側の仕事で、このリポジトリには持ちません。
 
+見た目は [Tailwind CSS](https://tailwindcss.com) v4 の実用クラスで書きます。
+組み立ては `bun-plugin-tailwind` が `src/app/styles.css` を横取りして済ませるので、`bun run build` の外に手順は増えません。
+配色と寸法は同ファイルの `@theme` が唯一の出どころで、そこに無い色や寸法は実用クラスとしても存在しません。
+
 ```
 build.ts                   dist/ の組み立て。manifest とアイコンもここで作る
 src/shared/types.ts        取得層と画面が共有する型。契約はここが唯一の正
@@ -111,7 +115,8 @@ src/x/timeline.ts          取得元ごとの呼び分けとページング
 src/x/actions.ts           いいね / リポスト / ブックマークの実行と取り消し
 src/x/error.ts             失敗を画面に出せる形へ写す。取得と操作で共有する
 src/x/map.ts               ライブラリのモデルから Tweet / Media への変換とフィルタ
-src/app/                   React の画面
+src/app/                   React の画面。見た目は実用クラスで各コンポーネントに書く
+src/app/styles.css         配色と寸法の語彙（@theme）、素の要素の既定、押せるものの共通クラス
 test/                      bun test
 ```
 

@@ -63,18 +63,41 @@ const GLYPH: Record<IconName, string> = {
   warning: 'fi-rr-triangle-warning',
 };
 
+/**
+ * 大きさ。md（15px）に寄せるのが原則で、置き場所ごとに刻まない。同じ行に別寸のアイコンが並ぶ。
+ * lg（20px）は 2 つだけ。ライトボックスの送り矢印は押す的の大きさが要り、
+ * ぼかしの上の印はぼけた写真の上で判る大きさが要る。
+ */
+type IconSize = 'md' | 'lg';
+
+const SIZE: Record<IconSize, string> = { md: 'text-icon', lg: 'text-icon-lg' };
+
 export interface IconProps {
   name: IconName;
-  /** 位置や大きさを変えたいときだけ。色と字送りは .ic が持つ。 */
+  size?: IconSize;
+  /**
+   * 位置と色を変えたいときだけ。大きさは size で指定する。
+   * font-size のクラスを 2 つ重ねると、どちらが勝つかは並び順ではなく生成された CSS の順で決まる。
+   */
   className?: string;
 }
 
 /**
  * Uicons は擬似要素で字を出すので、中身の無い要素を 1 つ置く。
  *
+ * 行の高さを 1 に固定するのは、行の高さがアイコンの有無で変わるのを防ぐため。
+ * 字体名の前に必ず空白を置くのは、Uicons のセレクタが `[class*=" fi-rr-"]` を見ているため。
+ *
  * aria-hidden を必ず付けるのは、字体のグリフが読み上げでは意味のない記号にしかならないため。
  * 文字を伴わないボタンは、これで無名になる。呼ぶ側が aria-label を付けること。
  */
-export function Icon({ name, className }: IconProps) {
-  return <i aria-hidden="true" className={className ? `ic ${GLYPH[name]} ${className}` : `ic ${GLYPH[name]}`} />;
+export function Icon({ name, size = 'md', className }: IconProps) {
+  return (
+    <i
+      aria-hidden="true"
+      className={`inline-flex shrink-0 items-center justify-center leading-none not-italic ${SIZE[size]}${
+        className ? ` ${className}` : ''
+      } ${GLYPH[name]}`}
+    />
+  );
 }

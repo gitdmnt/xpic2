@@ -6,11 +6,14 @@
 //
 // 画面は index.html を入口にして Bun に任せる。相対 import をたどって main.tsx と styles.css を
 // まとめ、ハッシュ付きの名前で吐いてくれるので、こちらで並べる資産の一覧を持たなくてよい。
+// styles.css は bun-plugin-tailwind が横取りして Tailwind を通す。使っているクラスは
+// この同じバンドルが辿った tsx から集まるので、拾い先の一覧もこちらで持たなくてよい。
 // background だけは別に組む。MV3 の service worker と Firefox の event page はどちらも
 // 単体のファイルとして読まれるので、import を残さない iife にする。
 
 import { watch } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
+import tailwind from 'bun-plugin-tailwind';
 import { ICON_SIZES, pngIcon } from './src/ext/icons.ts';
 import { manifest, type Target } from './src/ext/manifest.ts';
 import pkg from './package.json' with { type: 'json' };
@@ -27,6 +30,7 @@ async function build(): Promise<boolean> {
     entrypoints: ['src/app/index.html'],
     outdir,
     target: 'browser',
+    plugins: [tailwind],
     minify: true,
     // MV3 のページは既定の CSP が script-src 'self' なので、インライン化された断片は読み込めない。
     // 資産は必ず別ファイルとして吐かせる。

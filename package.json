@@ -23,7 +23,9 @@
     "@types/bun": "^1.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "bun-plugin-tailwind": "^0.1.2",
     "knip": "^6.34.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   }
 }
