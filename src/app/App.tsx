@@ -10,13 +10,14 @@ import { extStatus, isReady } from './lib/x.ts';
 import { usePersistedState } from './hooks/usePersistedState.ts';
 import { useTimeline } from './hooks/useTimeline.ts';
 import { useTweetActions } from './hooks/useTweetActions.ts';
+import { Icon } from './components/Icon.tsx';
 import { TopBar } from './components/TopBar.tsx';
-import { Toolbar } from './components/Toolbar.tsx';
 import { MasonryGrid } from './components/MasonryGrid.tsx';
 import type { TileItem } from './components/MasonryGrid.tsx';
 import { Lightbox } from './components/Lightbox.tsx';
 import type { LightboxEntry } from './components/Lightbox.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
+import type { SettingsTab } from './components/SettingsModal.tsx';
 
 const SOURCE_KEY = 'xpic2:source';
 const QUERY_KEY = 'xpic2:query';
@@ -99,7 +100,15 @@ export function App() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('display');
   const [lbIndex, setLbIndex] = useState(-1);
+
+  // どのタブを開くかは呼ぶ側が決める。自分で設定を開いた人が見たいのは表示設定だが、
+  // こちらが勝手に開くのは接続が整っていないときだけなので、開く理由ごとに行き先が違う。
+  const openSettings = useCallback((tab: SettingsTab) => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }, []);
 
   const queryInputRef = useRef<HTMLInputElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -170,8 +179,8 @@ export function App() {
         if (!alive) return;
         const ready = isReady(status);
         setConfigured(ready);
-        // 権限が無い・ログインしていないなら、何も読まずに設定モーダルを開く。
-        if (!ready) setSettingsOpen(true);
+        // 権限が無い・ログインしていないなら、何も読まずに接続タブを開く。
+        if (!ready) openSettings('connection');
       })
       .catch((e: unknown) => {
         if (alive) setConfigError(e instanceof Error ? e.message : '状況を取得できませんでした。');
@@ -179,12 +188,12 @@ export function App() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [openSettings]);
 
-  // cookie の失効は 401 で返ってくるので、設定モーダルを自動で開いて貼り直しへ誘導する。
+  // x.com のセッションが切れると 401 が返るので、接続タブを開いてログインし直しへ誘導する。
   useEffect(() => {
-    if (error?.status === 401) setSettingsOpen(true);
-  }, [error]);
+    if (error?.status === 401) openSettings('connection');
+  }, [error, openSettings]);
 
   // 操作の失敗は画面の隅に出す。読み流されても困らない内容なので、少し置いて自分で消す。
   useEffect(() => {
@@ -268,12 +277,12 @@ export function App() {
 
   // ── 状態表示 ─────────────────────────────────────────────────
   const status = (() => {
-    if (configError) return <div className="err">{configError}</div>;
-    if (configured === false) return <>まず接続設定を済ませてください。</>;
+    if (configError) return <div className="err"><Icon name="warning" /> {configError}</div>;
+    if (configured === false) return <>x.com への権限とログインが要ります</>;
     if (error) {
       return (
         <>
-          <div className="err">{error.message}</div>
+          <div className="err"><Icon name="warning" /> {error.message}</div>
           {error.hint ? <div className="hint">{error.hint}</div> : null}
         </>
       );
@@ -282,15 +291,18 @@ export function App() {
       return (
         <>
           <div className="spinner" />
-          読み込み中…
+          {/* 回る図形は読み上げに何も残さないので、字は隠したまま持たせる */}
+          <span className="sr-only">読み込み中</span>
         </>
       );
     }
     if (configured === true && !enabled && tiles.length === 0) {
-      return <>{source === 'search' ? '検索語を入力してください。' : 'ユーザー名を入力して「読み込む」を押してください。'}</>;
+      // 「読み込む」ボタンはアイコンだけになり、名前で指せなくなった。押す先を語らず、要るものだけ言う。
+      return <>{source === 'search' ? '検索語を入力' : 'ユーザー名を入力'}</>;
     }
     if (done) {
-      return <>{tiles.length === 0 ? '条件に合う画像付きポストが見つかりませんでした。' : 'これ以上ありません。'}</>;
+      // 終端は罫 1 本で足りる。ただし 0 件のときは引く罫の上に何も無く、線だけでは伝わらない。
+      return tiles.length === 0 ? <>見つかりません</> : <hr className="end" />;
     }
     return null;
   })();
@@ -303,11 +315,12 @@ export function App() {
         query={query}
         onQueryChange={handleQueryChange}
         onSubmit={handleSubmit}
-        onOpenSettings={() => setSettingsOpen(true)}
+        // 準備が済むまでは接続へ振る。未接続の本文は文言だけで、設定へ入る導線が歯車しか無いため。
+        onOpenSettings={() => openSettings(configured === false ? 'connection' : 'display')}
         queryInputRef={queryInputRef}
+        mediaCount={tiles.length}
+        tweetCount={tweets.length}
       />
-
-      <Toolbar opts={opts} onChange={patchOpts} mediaCount={tiles.length} tweetCount={tweets.length} />
 
       <main>
         <MasonryGrid tiles={tiles} opts={opts} onOpen={setLbIndex} actions={actions} onAction={handleAction} />
@@ -328,13 +341,21 @@ export function App() {
       {actionError ? (
         <div className="toast" role="status">
           <span>{actionError}</span>
-          <button type="button" className="ghost" aria-label="閉じる" onClick={dismissError}>
-            ✕
+          <button type="button" className="icon-btn" aria-label="閉じる" onClick={dismissError}>
+            <Icon name="close" />
           </button>
         </div>
       ) : null}
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onChanged={handleStatusChanged} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onChanged={handleStatusChanged}
+        opts={opts}
+        onOptsChange={patchOpts}
+        tab={settingsTab}
+        onTabChange={setSettingsTab}
+      />
     </>
   );
 }

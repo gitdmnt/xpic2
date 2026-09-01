@@ -1,6 +1,17 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/ext/background.ts", "test/**/*.test.ts"],
-  "project": ["src/**/*.{ts,tsx}", "test/**/*.ts"],
-  "tags": ["-public"]
+  "entry": [
+    "src/ext/background.ts",
+    "test/**/*.test.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "test/**/*.ts"
+  ],
+  "tags": [
+    "-public"
+  ],
+  "ignoreDependencies": [
+    "@flaticon/flaticon-uicons"
+  ]
 }

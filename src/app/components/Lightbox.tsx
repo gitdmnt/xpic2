@@ -5,6 +5,7 @@ import { ext } from '../../ext/browser.ts';
 import type { TweetActionState } from '../hooks/useTweetActions';
 import { compact, mediaUrl, relTime } from '../lib/format';
 import { ActionBar } from './ActionBar';
+import { Icon } from './Icon';
 
 /**
  * ライトボックスに並べる 1 枚分。
@@ -51,10 +52,40 @@ function save(url: string): Promise<unknown> {
 /** 拡大表示中のショートカット。x.com の割り当てに合わせてある。 */
 const ACTION_KEYS: Record<string, TweetAction> = { l: 'like', t: 'retweet', b: 'bookmark' };
 
+/** Tab で辿れる要素。 */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Tab を覆いの中で巡回させる。
+ * aria-modal は支援技術から外側を隠すだけで、フォーカスは止めてくれない。
+ * 宣言と実態を合わせないと、隠したはずの背後のタイルへフォーカスだけが出ていく。
+ */
+function trapTab(e: KeyboardEvent, root: HTMLElement): void {
+  const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (!first || !last) return;
+  const active = document.activeElement;
+  if (!(active instanceof Node) || !root.contains(active)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+    return;
+  }
+  if (e.shiftKey ? active === first : active === last) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  }
+}
+
 export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actions, onAction }: LightboxProps) {
   const entry = index >= 0 ? list[index] : undefined;
   const visible = entry !== undefined;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  /** 開く直前にフォーカスがあった要素。閉じたらここへ返す。 */
+  const restoreRef = useRef<HTMLElement | null>(null);
 
   // 前後移動。移植元と同じく端では反対側へ回り込む。
   // 負の剰余を避けるため length を足してからもう一度剰余を取る。
@@ -67,11 +98,19 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
   );
 
   // 表示中は背後のページをスクロールさせない。閉じても外れても必ず元へ戻す。
+  // フォーカスも同じ寿命で扱う。開いたら閉じるボタンへ移し、閉じたら開いた元へ返す。
   useEffect(() => {
     if (!visible) return;
     document.body.style.overflow = 'hidden';
+    const from = document.activeElement;
+    restoreRef.current = from instanceof HTMLElement ? from : null;
+    closeRef.current?.focus();
     return () => {
       document.body.style.overflow = '';
+      const back = restoreRef.current;
+      restoreRef.current = null;
+      // 読み直しで元の要素が消えていることもあるので、繋がっているときだけ返す。
+      if (back?.isConnected) back.focus();
     };
   }, [visible]);
 
@@ -83,6 +122,10 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
     const onKeyDown = (e: KeyboardEvent) => {
       // Cmd+L のようなブラウザ側の割り当ては奪わない。
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Tab') {
+        if (rootRef.current) trapTab(e, rootRef.current);
+        return;
+      }
       const action = ACTION_KEYS[e.key];
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight' || e.key === 'j') move(1);
@@ -130,15 +173,17 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
   };
 
   return (
-    <div className="lightbox" role="dialog" aria-modal="true" onClick={closeOnSelf}>
-      <button className="lb-close" aria-label="閉じる" onClick={onClose}>
-        ✕
+    <div className="lightbox" ref={rootRef} role="dialog" aria-modal="true" onClick={closeOnSelf}>
+      {/* 記号の文字（✕ ‹ ›）は字体次第で大きさも重心も揃わないので、アイコンに寄せる。 */}
+      {/* .icon-btn は付けない。あちらのホバー色は生成り地向けで、墨地のここでは字が地に沈む。 */}
+      <button ref={closeRef} className="lb-close" aria-label="閉じる" onClick={onClose}>
+        <Icon name="close" />
       </button>
       <button className="lb-nav prev" aria-label="前へ" onClick={() => move(-1)}>
-        ‹
+        <Icon name="prev" />
       </button>
       <button className="lb-nav next" aria-label="次へ" onClick={() => move(1)}>
-        ›
+        <Icon name="next" />
       </button>
 
       <figure className="lb-stage" onClick={closeOnSelf}>
@@ -169,7 +214,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
 
       <figcaption className="lb-info">
         <img className="av" src={tweet.user.avatar} alt="" />
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="lb-body">
           <div>
             <span className="who">{tweet.user.name}</span>{' '}
             <span className="handle">
@@ -179,30 +224,64 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
           </div>
           {tweet.text ? <div className="txt">{tweet.text}</div> : null}
           <div className="row">
+            {/* 共有（URL のコピー）は下のリンク束ではなく操作ボタンの並びに置く。
+                あちらは「この画像をどう開くか」で、コピーの対象はポストだから。 */}
             <ActionBar
               tweet={tweet}
               state={actions.get(tweet.id)}
               onAction={onAction}
-              showCounts
+              counts="all"
+              share
               className="lb-actions"
             />
-            {tweet.stats.views ? <span>👁 {compact(tweet.stats.views)}</span> : null}
-            <span>
-              {media.width}×{media.height}
-            </span>
-            <a href={tweet.url} target="_blank" rel="noreferrer noopener">
-              X で開く
-            </a>
-            <a href={orig} target="_blank" rel="noreferrer noopener">
-              原寸
-            </a>
-            {/* サーバ版は中継してファイル名を付けていた。拡張機能では downloads API がそれをやる。 */}
-            <button type="button" className="aslink" onClick={() => void save(saveUrl)}>
-              保存
-            </button>
-            <span style={{ color: 'var(--fg-faint)' }}>
-              {index + 1} / {list.length}
-            </span>
+            <div className="lb-links">
+              {/* アイコンは aria-hidden なので、数だけでは何の数か伝わらない。 */}
+              {tweet.stats.views ? (
+                <span role="img" aria-label={`閲覧数 ${compact(tweet.stats.views)}`}>
+                  <Icon name="views" /> {compact(tweet.stats.views)}
+                </span>
+              ) : null}
+              <span>
+                {media.width}×{media.height}
+              </span>
+              {/* 3 つとも字を落としてアイコンだけにした。Icon は aria-hidden なので、
+                  aria-label が無いとリンクもボタンも無名になる。落とした語はそのまま
+                  aria-label と title に移してあり、読み上げとホバーでは今までどおり出る。 */}
+              <a
+                className="lb-link"
+                href={tweet.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="X で開く"
+                title="X で開く"
+              >
+                <Icon name="external" />
+              </a>
+              <a
+                className="lb-link"
+                href={orig}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label="原寸"
+                title="原寸"
+              >
+                <Icon name="expand" />
+              </a>
+              {/* サーバ版は中継してファイル名を付けていた。拡張機能では downloads API がそれをやる。 */}
+              <button
+                type="button"
+                className="aslink lb-link"
+                aria-label="保存"
+                title="保存"
+                onClick={() => void save(saveUrl)}
+              >
+                <Icon name="download" />
+              </button>
+              {/* 墨地なので生成り向けの --fg-faint では読めない。色はクラスへ預けて styles.css に決めさせる。 */}
+              <span className="lb-index">
+                {index + 1} / {list.length}
+              </span>
+            </div>
           </div>
         </div>
       </figcaption>

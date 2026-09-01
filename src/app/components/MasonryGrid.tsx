@@ -22,7 +22,7 @@ interface MasonryGridProps {
   onAction(tweet: Tweet, action: TweetAction): void;
 }
 
-/** タイル間の余白。style.css の見た目に合わせた固定値（Node 版の GAP と同じ）。 */
+/** タイル間の余白。タイルの座標は JS で計算するので、CSS ではなくここが余白の唯一の出どころ（Node 版の GAP と同じ値）。 */
 const GAP = 12;
 
 /** 極端な縦長・横長は列を壊すので、Node 版と同じ範囲に丸める。 */
@@ -42,7 +42,7 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction }: MasonryG
   const { placements, height } = useMasonry({
     aspects,
     containerWidth,
-    colWidth: opts.colWidth,
+    columns: opts.columns,
     gap: GAP,
     footer: opts.meta ? META_HEIGHT : 0,
   });

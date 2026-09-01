@@ -1,18 +1,66 @@
-/* xpic2 の全スタイル。public/style.css からの移植で、クラス名は一切変えていない。 */
+/* xpic2 の全スタイル。
+ *
+ * 地は生成り、文字は墨、差し色は藍鼠の 1 点だけ。写真がいちばん強い要素になるように、
+ * 囲み（罫・影・角丸・彩度）はどれも主張を落としてある。値を足すときは次の刻みから外れないこと。
+ *
+ * - 罫は 1px、色は --line。強めたいときだけ --line-strong に振り替える。太さは増やさない。
+ *   テキスト入力の輪郭だけは --line-input（罫が唯一の手がかりになる場所なので濃くする）。
+ * - 角丸は操作要素が --r-sm、面（タイル・シート・トーストなど）が --r-md の 2 段だけ。
+ * - 余白は 4 の倍数。例外は masonry と対になっている .meta の高さと、
+ *   写真の上に小さく敷く .badge span の padding の 2 つだけ。
+ * - 影は --shadow-2（地の上に浮く面）と --shadow-3（覆いの上のシート）の 2 段だけ。
+ *   地の上に浮くもの以外には付けない。
+ * - ホバーは地を --bg-shade へ沈めるだけにする。色が跳ねると押す前から結果が変わって見える。
+ */
+
+/* @import は他のどの規則よりも前でなければ効かない。 */
+@import '@flaticon/flaticon-uicons/css/regular/rounded.css';
 
 :root {
-  color-scheme: dark;
-  --bg: #0b0d11;
-  --bg-elev: #14181f;
-  --bg-elev2: #1b2029;
-  --line: #262d38;
-  --fg: #e8ecf3;
-  --fg-dim: #97a2b3;
-  --fg-faint: #6b7686;
-  --accent: #6ee7ff;
-  --accent2: #a78bfa;
-  --danger: #ff7a7a;
-  --gap: 12px;
+  color-scheme: light;
+
+  /* 地 ── 生成り */
+  --bg:        #f4f1e8;  /* ページ地 */
+  --bg-elev:   #fbf9f3;  /* タイル・シートなど一段上の面 */
+  --bg-elev2:  #ece8dc;  /* 入力欄・状況表示など一段沈めた面 */
+  --bg-shade:  #e4dfd0;  /* ホバーで沈める色 */
+  --veil:      rgba(244, 241, 232, .88);  /* 吸着ヘッダの半透明地 */
+
+  /* 罫 */
+  --line:        #e0dacb;
+  --line-strong: #cdc5b1;
+  /* --line は生成り地に対して 1.23:1 しかなく、罫 1 本では入力欄の在り処が判らない。
+     テキスト入力の輪郭にだけこれを当て、非文字コントラスト 3:1 (WCAG 1.4.11) を満たす。 */
+  --line-input:  #8f8674;   /* 生成り地に対して 3.20:1 */
+
+  /* 文字 ── 純黒を避け、地の黄みに合う墨色にする */
+  --fg:       #2b2822;
+  --fg-dim:   #6b6558;
+  --fg-faint: #736c5c;
+
+  /* 差し色 ── 藍鼠。生成りに一点だけ落とす */
+  --accent:        #44566a;
+  --accent-strong: #2e3d4c;
+  --accent-weak:   rgba(68, 86, 106, .10);
+  --on-accent:     #fbf9f3;
+
+  /* 状態色 ── 彩度を抑えた和の色 */
+  --like:     #b0505d;  /* 蘇芳 */
+  --repost:   #3f6e50;  /* 老緑 */
+  --bookmark: #44566a;
+  --danger:   #a2443e;
+
+  /* かたち */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --shadow-2: 0 10px 28px rgba(58, 48, 30, .10);
+  --shadow-3: 0 28px 64px rgba(58, 48, 30, .20);
+
+  /* ライトボックスだけは墨地にする（写真を見るための面なので地を沈める） */
+  --lb-bg:   #1b1915;
+  --lb-fg:   #f0ece1;
+  --lb-dim:  #a9a294;
+  --lb-line: rgba(240, 236, 225, .16);
 }
 
 * { box-sizing: border-box; }
@@ -28,97 +76,170 @@ html, body {
   font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
 }
 
-body { padding-bottom: 80px; }
+/* body の下余白は持たせない。終端の余白は .status の padding 1 か所が持つ。
+   吸着ツールバーがあった頃は逃げが要ったが、いまは下端に置かれているものが無い
+   （.toast は position: fixed なので流れの外）。 */
+
+/* 輪郭は 1 か所でまとめて与える。個別に outline: none を書くと、その要素だけ
+   キーボードで追えなくなる。色を変えるのは地が墨のライトボックスだけ（末尾で上書き）。 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 目には出さず読み上げには残す。アイコンだけのボタンに語を添えるために使う。 */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
 
 button, input, textarea, select { font: inherit; color: inherit; }
 
+/* アイコンと文字を並べる口をボタン側に持たせる。
+   .ic が自分で margin を持つと、置く場所ごとに間隔がずれる。 */
 button {
-  background: var(--bg-elev2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--bg-elev);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
   cursor: pointer;
   transition: background .12s, border-color .12s, color .12s;
 }
-button:hover { background: #232a35; border-color: #38414f; }
+button:hover { background: var(--bg-shade); border-color: var(--line-strong); }
+button:disabled { opacity: .45; cursor: default; }
+
 button.primary {
-  background: linear-gradient(180deg, var(--accent), #35c8e8);
-  border-color: transparent;
-  color: #04222b;
-  font-weight: 700;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
 }
-button.primary:hover { filter: brightness(1.08); }
-button.ghost { background: transparent; }
+button.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+
+button.ghost { background: transparent; border-color: transparent; color: var(--fg-dim); }
+button.ghost:hover { background: var(--bg-shade); border-color: transparent; color: var(--fg); }
+
+/* ── アイコン ─────────────────────────────── */
+/* Uicons は ::before で字を出すので、この要素自身に文字は入らない。
+   line-height を 1 に固定するのは、行の高さがアイコンの有無で変わるのを防ぐため。
+   大きさはここの 15px 1 つに寄せる。置き場所ごとに刻むと同じ行に別寸のアイコンが並ぶ。
+   例外は 2 つだけ。ライトボックスの送り矢印（.lb-nav .ic）は押す的の大きさが要り、
+   ぼかしの上の印（.sensitive-tag .ic）はぼけた写真の上で判る大きさが要る。 */
+.ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  line-height: 1;
+  font-size: 15px;
+  font-style: normal;
+}
 
 /* ── ヘッダ ───────────────────────────────── */
+/* 唯一の吸着要素。高さは中身と折り返しで変わるので、他所からは高さを当てにしない。 */
 .bar {
   position: sticky;
   top: 0;
   z-index: 30;
   display: flex;
   align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 10px 16px;
-  background: rgba(11, 13, 17, .82);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 800;
-  letter-spacing: .04em;
-}
-.logo {
-  width: 16px; height: 16px; border-radius: 4px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-}
-
-.tabs { display: flex; gap: 4px; background: var(--bg-elev); padding: 3px; border-radius: 10px; border: 1px solid var(--line); }
-.tabs button { background: transparent; border: 0; color: var(--fg-dim); padding: 5px 11px; border-radius: 7px; }
-.tabs button:hover { color: var(--fg); background: var(--bg-elev2); }
-.tabs button.on { background: var(--bg-elev2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
-
-.query { display: flex; gap: 6px; flex: 1 1 240px; min-width: 200px; }
-.query input {
-  flex: 1;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 11px;
-  outline: none;
-}
-.query input:focus { border-color: var(--accent); }
-.query input:disabled { opacity: .4; }
-
-/* ── ツールバー ───────────────────────────── */
-/* top はヘッダの実測高さ（53px）に合わせてある。ヘッダの padding を変えたらここも変える。 */
-.toolbar {
-  position: sticky;
-  top: 53px;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  gap: 8px 16px;
   flex-wrap: wrap;
   padding: 8px 16px;
-  background: rgba(11, 13, 17, .82);
-  backdrop-filter: blur(14px);
+  background: var(--veil);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
-  font-size: 13px;
+}
+
+/* 名前の字が消えて四角だけになったので、器（.brand）ごと畳んで .bar の直接の子にした。
+   12px では点に見えるので 16px に戻す。flex: none は、ヘッダが詰まったとき
+   唯一の中身が無い要素であるここが真っ先に潰れるのを止めるため。 */
+.logo {
+  width: 16px; height: 16px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+}
+
+/* タブの見た目はヘッダと設定モーダルで共有する。同じ役目のものに 2 つの流儀を作らない。
+   字を落としてアイコン 1 つになったので、正方形の的にする。32px 角は .icon-btn と同じで、
+   ヘッダに並ぶ押せるものの寸法をこれ 1 つに揃えられる。 */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab, .sheet-tab {
+  width: 32px; height: 32px;
+  padding: 0;
+  flex: none;
+  background: transparent;
+  border-color: transparent;
   color: var(--fg-dim);
 }
-.ctl { display: flex; align-items: center; gap: 8px; }
-.ctl input[type=range] { width: 130px; accent-color: var(--accent); }
-.ctl output { min-width: 3ch; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
-.chk { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
-.chk input { accent-color: var(--accent); }
-.sep { width: 1px; height: 18px; background: var(--line); }
-.grow { flex: 1; }
-.counter { color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.tab:hover, .sheet-tab:hover { background: var(--bg-shade); border-color: transparent; color: var(--fg); }
+/* 選択中の手掛かりは塗りと字色しか残っていない。--accent-weak (.10) は生成り地に対して
+   1.16:1 で、ホバーの --bg-shade (1.18:1) より薄い。字があった頃は語が選択を語っていたが、
+   いまのままだと「触っているタブ」のほうが「選んでいるタブ」より濃く見える。
+   ここだけ差し色を 1 段濃く敷いて 1.30:1 にする。罫は足さない（囲みを増やさない方針）。
+   値は --accent の rgb そのもの。alpha 違いのトークンが無いのでここだけ直値で書いている。 */
+.tab.on, .sheet-tab.on {
+  background: rgba(68, 86, 106, .18);
+  border-color: transparent;
+  color: var(--accent-strong);
+}
+
+/* 字を落としたヘッダでは、伸びてよい要素はこの欄だけになる。flex: 1 のままだと
+   空いた幅を全部吸って 1000px 近い空箱になり、生成りの余白が消える。
+   だから欄は伸ばさず、余った幅は margin-left: auto に食わせて左右の束を離す。 */
+.query { display: flex; gap: 8px; margin-left: auto; min-width: 0; }
+.query-field { position: relative; display: flex; align-items: center; flex: 0 1 320px; min-width: 140px; }
+/* 虫眼鏡は飾りなので触れない。左の余白はアイコンの実幅から決めてある。 */
+.query-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--fg-faint);
+  pointer-events: none;
+}
+/* 上下の余白が 4px なのは、隣に並ぶアイコンの的（32px 角）と背丈を揃えるため。
+   ここだけ 40px あると、字が消えて低くなったヘッダの中で入力欄だけが浮く。 */
+.query input {
+  width: 100%;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-input);
+  border-radius: var(--r-sm);
+  padding: 4px 12px 4px 36px;
+}
+.query input::placeholder { color: var(--fg-faint); }
+.counter {
+  color: var(--fg-dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* アイコンだけのボタン。中身が無い分、地も罫も持たせず、触れたときだけ沈める。 */
+.icon-btn {
+  width: 32px; height: 32px;
+  padding: 0;
+  flex: none;
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-dim);
+}
+.icon-btn:hover { background: var(--bg-shade); border-color: transparent; color: var(--fg); }
+/* 「読み込む」は .primary と .icon-btn を併せ持つ。地と字色は button.primary (0,1,1) が
+   .icon-btn (0,1,0) に詳細度で勝つので、藍鼠の地に --on-accent のアイコンのまま残る。
+   .primary を要素名の付かない .primary へ書き換えると同着になり、後ろにある .icon-btn の
+   transparent / --fg-dim が勝って、藍鼠の上に藍鼠のアイコンが出る。ここは書き換えないこと。 */
 
 /* ── masonry ─────────────────────────────── */
 main { padding: 16px; }
@@ -130,7 +251,7 @@ main { padding: 16px; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--bg-elev);
   border: 1px solid var(--line);
   cursor: zoom-in;
@@ -139,7 +260,7 @@ main { padding: 16px; }
   /* バニラ版は .fresh を一時的に付けて「その場に出す」処理をしていたが、React では
      要素の生成時点で最終位置の transform がインラインで入るため原点からの飛び込みが起きない。
      よって .fresh は廃止し、入場アニメーションを .tile へ直接当てる。
-     列幅変更などで既存タイルが動くときは上の transition だけが効く。 */
+     列数変更などで既存タイルが動くときは上の transition だけが効く。 */
   animation: pop .32s ease both;
 }
 
@@ -149,43 +270,53 @@ main { padding: 16px; }
 
 /* .thumb は残りの高さを埋める。タイル高さは masonry 側で
    round(colW / aspect) + footer として算出済みなので、実際には伸縮せずぴたりと収まる。 */
-.tile .thumb { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #0f1319; }
+.tile .thumb { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; background: var(--bg-elev2); }
 .tile img.pic, .tile video.pic {
   display: block;
   width: 100%; height: 100%;
   object-fit: cover;
-  background: #0f1319;
+  background: var(--bg-elev2);
 }
 .tile.blur img.pic, .tile.blur video.pic { filter: blur(24px) saturate(.6); transform: scale(1.1); }
-.tile.blur .sensitive-tag { display: block; }
+.tile.blur .sensitive-tag { display: flex; }
+/* ぼかしの下の写真は明るさが読めないので、印の側に地を敷いて成立させる。
+   影で浮かせる手は、地が明るいと効かない。
+   中身が字からアイコン 1 つになったので、揃えるのは text-align ではなく flex の中央寄せ。 */
 .sensitive-tag {
   display: none;
   position: absolute; inset: auto 0 50% 0;
-  text-align: center; font-size: 12px; color: #fff; text-shadow: 0 1px 4px #000;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: var(--veil);
+  color: var(--fg);
   pointer-events: none;
 }
-.tile:hover { border-color: #3b4658; }
-.tile:hover img.pic { filter: brightness(1.04); }
+/* 語 1 つ分あった面積が絵 1 つに縮む。15px のままではぼけた写真の上で何の絵か判らない。 */
+.sensitive-tag .ic { font-size: 20px; }
+/* 触れたときに動くのは囲みだけ。写真の明るさは変えない（見えているものが変わってしまう）。 */
+.tile:hover { border-color: var(--line-strong); }
 
 .badge {
   position: absolute;
-  top: 6px; right: 6px;
+  top: 8px; right: 8px;
   display: flex; gap: 4px;
-  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  font-size: 11px;
+  letter-spacing: .02em;
 }
+/* 写真の明暗に関わらず読めるよう、地の生成りをそのまま小さく敷く。 */
 .badge span {
-  background: rgba(0,0,0,.62);
-  backdrop-filter: blur(4px);
+  background: var(--veil);
+  color: var(--fg);
   padding: 2px 6px;
-  border-radius: 6px;
-  color: #fff;
+  border-radius: var(--r-sm);
 }
 
 /* 高さ 34px は masonry の footer 値と対になっている。片方だけ変えると行がずれる。 */
 .meta {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 8px;
   flex: none;
-  padding: 6px 8px;
+  padding: 0 8px;
   height: 34px;
   font-size: 12px;
   color: var(--fg-dim);
@@ -193,37 +324,91 @@ main { padding: 16px; }
   background: var(--bg-elev);
 }
 .meta img { width: 18px; height: 18px; border-radius: 50%; flex: none; }
-.meta .name { color: var(--fg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.meta .likes { margin-left: auto; flex: none; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+/* 投稿者名。この行で伸び縮みしてよいのは名前だけなので、伸びる側と縮む側を両方ここが持つ。
+   min-width: 0 が無いと flex アイテムは中身の最小幅（日本語なら 1 文字ぶん）より細くならず、
+   列数を 8 まで増やして 1 タイルが 132px まで痩せたとき、名前が縮まずに右のボタンを
+   行の外へ押し出す。flex: 1 1 auto と対にして、余った幅は名前が受け取り、
+   足りない幅も名前が先に手放して省略記号になるようにする。
+   字色を --fg まで上げるのは、これがメタ行で唯一の「読ませる」中身になったため。 */
+.meta .name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+  font-weight: 500;
+}
 
-/* ── 操作ボタン（いいね・リポスト・ブックマーク） ─── */
-.actions { display: flex; align-items: center; gap: 2px; }
+/* ── 操作ボタン（いいね・リポスト・ブックマーク・共有） ─── */
+.actions { display: flex; align-items: center; gap: 4px; }
 .actions .act {
-  display: flex; align-items: center; gap: 5px;
-  padding: 5px 7px;
+  gap: 4px;
+  padding: 4px 8px;
   background: transparent;
-  border: 0;
-  border-radius: 7px;
+  border-color: transparent;
   color: var(--fg-dim);
   line-height: 1;
 }
-.actions .act:hover { background: rgba(255,255,255,.14); border-color: transparent; color: var(--fg); }
+.actions .act:hover { background: var(--bg-shade); border-color: transparent; color: var(--fg); }
 /* 送信中は押せない。取り消し待ちと実行待ちの見分けは付かないので、色は変えず薄くするだけ。 */
-.actions .act:disabled { opacity: .45; cursor: progress; }
-.act svg { display: block; width: 17px; height: 17px; }
+.actions .act:disabled { cursor: progress; }
+/* 手書きの SVG も .ic と同じ 15px にする。ライトボックスでは同じ行に両方が並ぶ。 */
+.act svg { display: block; width: 15px; height: 15px; }
 .act .n { font-size: 12px; font-variant-numeric: tabular-nums; }
-.act.on.like { color: #ff6b8b; }
-.act.on.retweet { color: #4fd18b; }
-.act.on.bookmark { color: var(--accent); }
+.act.on.like { color: var(--like); }
+.act.on.retweet { color: var(--repost); }
+.act.on.bookmark { color: var(--bookmark); }
+/* 共有には .on が付かない（押しても残る状態が無い）ので、状態色も要らない。
+   4 つのうちここだけ色を持たないことが、押しても何も溜まらないことの手掛かりになる。 */
 
-/* タイルの上に重ねる版。ホバーで出すが、何か掛かっているタイルでは出したままにする。 */
+/* タイルの中に置く版だけ、左右の余白を .actions の 8px から詰める。共有が 4 つめに増えて
+   8px のままでは細い列に入らない。列幅の下限は useMasonry の MIN_COL_WIDTH の 132px で、
+   タイルの内寸は 130px、メタ行はさらに左右 8px を引いた 114px しかない。
+   アバター 18px と隙間 8px×2 を除いた 80px に 4 つ並べるので、1 つあたり 20px が目安になる。
+   アイコン 15px + 左右 2px + 罫 1px の 21px にして、隙間 0 で 84px に収めた
+   （余る 4px は行の右余白 8px から借りる。タイルの縁までは届かない）。
+   隙間を 0 にしても、絵と絵の間には左右の余白が足して 4px 残る。
+   画像の上に重ねる版も同じ寸法にする。あちらは 132px のタイルで
+   4×21 + 隙間 4×3 + 内側余白 8 = 104px となり、左端 8px から置いても縁に届かない。
+   当たり判定 21×25px は 24px をわずかに割るが、ここまで細るのは利用者が自分で 8 列を
+   選んだときだけで、既定の自動では 290px 目安の列になり余白のほうが余る。
+   ライトボックスは器が広いので、あちらは .actions の 8px のまま触らない。 */
+.tile .act { padding: 4px 2px; }
+
+/* メタ行に置く版。ホバーで出す演出は使わない。壁を眺めている間ずっと目に入るので、
+   押していないボタンは --fg-faint まで沈め、色が立つのはホバー（--fg）と
+   押した状態（蘇芳・老緑・藍鼠）だけにする。写真より先にボタンが目に入ってはいけない。
+   #736c5c はタイル地 (--bg-elev) に対して 4.95:1 あり、数字を添えても本文として読める。
+   隙間を 0 にするのは幅のためだけではない。4 つが 1 つの束に見えるので、
+   名前とボタンの境目がはっきりする。 */
+.meta-actions { margin-left: auto; flex: none; gap: 0; }
+.meta-actions .act { color: var(--fg-faint); }
+
+/* いいねに添える数字は、この行でいちばん幅の読めない中身である。「69K」で 27px、
+   桁が伸びればもっと要る。細い列ではこれだけで共有ボタンを行の外へ押し出すうえ、
+   押し出される前に投稿者名が先に消える。名前は「要る」と言われて戻したものなので、
+   狭いときに手放すのは名前ではなく数字のほうにする。
+   タイル幅を問い合わせ先にできるよう .tile に閉じ込めを置く。幅も高さも masonry が
+   実寸で与えているので、寸法の閉じ込めで循環は起きない。
+   問い合わせが見るのは罫の内側の幅なので、237px はタイルの実幅 239px にあたる。
+   つまり 240px から数字が出る。そこで名前に 6 文字ぶん (77px) 残る。 */
+.tile { container-type: inline-size; }
+@container (max-width: 237px) {
+  .meta-actions .n { display: none; }
+}
+
+/* タイルの上に重ねる版。ボタンがメタ行へ移ったあとも、この節は消さないこと。
+   「情報を表示」を切るとメタ行ごと無くなるので、そちらの利用者にはここだけが操作の口になる。
+   ホバーで出すが、何か掛かっているタイルでは出したままにする。
+   内側余白を 4px にしてあるのは、ボタンの角丸(--r-sm)と足して外側の角丸(--r-md)に一致させるため。
+   ここがずれると入れ子の弧が二重にぶれて見える。 */
 .tile-actions {
   position: absolute;
-  left: 5px; bottom: 5px;
-  padding: 1px;
-  border-radius: 9px;
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(4px);
+  left: 8px; bottom: 8px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--veil);
   opacity: 0;
   transition: opacity .12s;
 }
@@ -234,143 +419,273 @@ main { padding: 16px; }
 @media (hover: none) { .tile-actions { opacity: 1; } }
 
 /* ライトボックス版。左端を本文の行頭に揃えるため、ボタンの内側余白の分だけ戻す。 */
-.lb-actions { margin-left: -7px; }
+.lb-actions { margin-left: -8px; }
 
 /* ── 状態表示 ─────────────────────────────── */
-.status { padding: 28px 16px 48px; text-align: center; color: var(--fg-dim); }
+/* 読み込み中に出るのは 20px の円 1 つだけになった。字の 1 行分を見込んだ 32/48 の余白では
+   円が宙に浮くので、上下とも詰める。下だけ厚いのは、body に下余白が無くここが頁の終いを持つため。 */
+.status { padding: 24px 16px 40px; text-align: center; color: var(--fg-dim); }
 .status .err { color: var(--danger); }
-.status .hint { color: var(--fg-faint); font-size: 13px; margin-top: 6px; }
+.status .hint { color: var(--fg-faint); font-size: 13px; margin-top: 8px; }
+/* 下の 12px は「読み込み中…」の字との間隔だった。字が sr-only へ移り、間を空ける相手がいない。 */
 .spinner {
-  width: 22px; height: 22px; margin: 0 auto 10px;
+  width: 20px; height: 20px; margin: 0 auto;
   border: 2px solid var(--line); border-top-color: var(--accent);
   border-radius: 50%; animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* 無限スクロールのセンチネル。id / class のどちらで書かれても効くようにしてある。 */
-#sentinel, .sentinel { height: 1px; }
+
+/* 「これ以上ありません。」の代わりに引く 1 本。飾りではなく終いの印なので、
+   罫 1 本ぶんの太さと、字より短い 40px に留める。--line-strong なのは、
+   1px の罫が 1 本だけ孤立して置かれ、他に手掛かりが無いため。 */
+.end {
+  width: 40px;
+  margin: 8px auto;
+  border: 0;
+  border-top: 1px solid var(--line-strong);
+}
+/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */
+#sentinel { height: 1px; }
 
 /* ── 設定モーダル ─────────────────────────── */
+/* 覆いは墨を薄く流すだけにする。背後の生成りが透けて見えるほうが、戻る先が分かる。
+   値は --fg (#2b2822) の rgb そのもの。覆い用のトークンが無いのでここだけ直値で書いている。 */
 .modal {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(4, 6, 9, .7);
-  backdrop-filter: blur(6px);
+  background: rgba(43, 40, 34, .40);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 6vh 16px;
   overflow: auto;
 }
 .sheet {
+  position: relative;
   width: min(760px, 100%);
   background: var(--bg-elev);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 20px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.6);
+  border-radius: var(--r-md);
+  padding: 24px;
+  box-shadow: var(--shadow-3);
 }
-.sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.sheet h2 { margin: 0; font-size: 17px; }
-.lede { color: var(--fg-dim); font-size: 13px; margin: 0 0 14px; }
-.field { display: block; margin: 12px 0; }
-.field > span { display: block; font-size: 12px; color: var(--fg-dim); margin-bottom: 5px; }
+/* 見出しが sr-only に移り、header に流れの中の中身は残っていない。閉じるを角へ浮かせると
+   header は高さを持たなくなり、目に見える帯はタブの 1 本だけになる。header にも余白を
+   持たせると、✕ だけの帯とタブの帯が二重に積まれる。位置の取り方は .lb-close と同じ。
+   top / right が 24px なのは .sheet の padding と同じ値で、タブの行と背丈が揃うため。
+   header 自身に並べ方（display: flex や justify-content）は持たせない。h2 は sr-only で、
+   閉じるは下の規則で浮いているから、流れの中に並べる相手がひとつも残っていない。
+   書いても効かないうえ、「まだ流れの中に中身がある」という読み違いだけが残る。 */
+.sheet header .icon-btn { position: absolute; top: 24px; right: 24px; }
+/* 下の余白はこちらが持つ（header は持たない）。タブが header の中へ移っても同じに見える。 */
+.sheet-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 24px; }
+
+/* タブ 1 枚分の中身。小見出しどうしの間はここで一律に決め、各 .opt-group には持たせない。
+   grid の gap は子の margin と相殺せず足し算になるので、直下の子は margin を持たないこと。
+   持たせると節ごとに間隔がばらける。中の通常フロー（details の内側など）は .field が持つ。 */
+.panel { display: grid; gap: 24px; }
+.opt-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--fg-dim);
+}
+.opt-list { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+
+/* 段組みの数だけ横に並ぶので、狭い画面では折り返させる。
+   罫で継いだ一体の帯にすると、折り返した瞬間に継ぎ目が破綻する。 */
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg-btn {
+  min-width: 44px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* 選んだ状態の見せ方はタブ（.tab.on / .sheet-tab.on）に倣う。
+   ここだけ罫を差し色にすると、同じシートの中で列数セグメントがいちばん濃い図形になる。
+   塗りをタブほど濃くしないのは、こちらには「自動」「3」という字が残っているためで、
+   選択は字色（--accent-strong）が先に伝える。塗りは念押しでよい。 */
+.seg-btn.on {
+  background: var(--accent-weak);
+  border-color: transparent;
+  color: var(--accent-strong);
+}
+
+.chk { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.chk input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; flex: none; }
+
+/* 下余白の 8px は、小見出しの直下に置いた「自動」の説明のためのものだった。その一文が消え、
+   残る .lede は接続タブの 2 つだけになった。片方は .panel の直接の子なので、余白は
+   grid の gap 24px が持つ（margin を足すと 32px になり、節ごとに間隔がばらける）。
+   もう片方は details の中で .field と隣り合い、あちらの上余白 16px が相殺して持つ。 */
+.lede { color: var(--fg-dim); font-size: 13px; margin: 0; }
+.field { display: block; margin: 16px 0; }
+.field > span { display: block; font-size: 12px; color: var(--fg-dim); margin-bottom: 4px; }
 textarea {
   width: 100%;
-  background: #0d1016;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 9px 11px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--line-input);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
   resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.5;
-  outline: none;
 }
-textarea:focus { border-color: var(--accent); }
 details summary { cursor: pointer; color: var(--fg-dim); font-size: 13px; }
-.actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+
+/* .actions は ActionBar と名前がぶつかっている。シートの中に ActionBar は出ないので、
+   ここだけ子孫セレクタで囲い、いいね等のボタン間隔を巻き添えにしない。 */
+.sheet .actions { flex-wrap: wrap; gap: 12px; }
 .msg { font-size: 13px; color: var(--accent); }
 .msg.bad { color: var(--danger); }
 .statusbox {
-  margin-top: 14px; padding: 10px 12px;
-  background: #0d1016; border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px;
+  background: var(--bg-elev2); border: 1px solid var(--line); border-radius: var(--r-md);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px; color: var(--fg-dim); white-space: pre-wrap;
 }
 /* 権限とログインは満たしているかどうかが一目で要るので、行ごとに色を振る。 */
-.statusbox .ok { color: #4fd18b; }
+.statusbox .ok { color: var(--repost); }
 .statusbox .ng { color: var(--danger); }
-.statusbox .sub { padding-left: 1.2em; color: var(--fg-faint); }
-.fine { color: var(--fg-faint); font-size: 12px; margin: 14px 0 0; }
-code { background: #0d1016; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+/* --fg-faint の 4.6:1 はページ地に対する値で、沈めた地 (--bg-elev2) の上では
+   4.26:1 まで落ちる。この面に置く本文サイズの字は 1 段濃い --fg-dim にする。 */
+.statusbox .sub { padding-left: 1.2em; color: var(--fg-dim); }
+.fine { color: var(--fg-faint); font-size: 12px; margin: 0; }
 
 /* ── 操作の失敗通知 ───────────────────────── */
 /* ライトボックス(z-index: 70)より前に出す。拡大表示中に押しても読めるようにするため。 */
 .toast {
   position: fixed;
-  left: 50%; bottom: 18px;
+  left: 50%; bottom: 16px;
   transform: translateX(-50%);
   z-index: 80;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 12px;
   max-width: min(680px, calc(100% - 32px));
-  padding: 9px 10px 9px 14px;
-  background: var(--bg-elev2);
+  padding: 8px 8px 8px 16px;
+  background: var(--bg-elev);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 14px 34px rgba(0,0,0,.55);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
   color: var(--danger);
   font-size: 13px;
 }
-.toast button { flex: none; padding: 2px 8px; color: var(--fg-dim); }
+.toast button { flex: none; padding: 4px 8px; color: var(--fg-dim); }
 
 /* ── ライトボックス ───────────────────────── */
+/* ここだけ墨地にする。周りを沈めないと写真の明暗が正しく見えない。
+   この節は生成り側の規則より後に置き、色を上書きする。 */
 .lightbox {
   position: fixed; inset: 0; z-index: 70;
-  background: rgba(3, 5, 8, .95);
+  background: var(--lb-bg);
+  color: var(--lb-fg);
   display: grid;
   grid-template-rows: 1fr auto;
 }
+/* 輪郭の藍鼠は墨地の上で沈むので、この面だけ地の色で描く。 */
+.lightbox :focus-visible { outline-color: var(--lb-fg); }
 .lb-stage {
   margin: 0; display: flex; align-items: center; justify-content: center;
   padding: 24px 64px 8px; min-height: 0;
 }
+/* 墨地の上では影が働かないので付けない。角丸も写真の縁を削らない程度に留める。 */
 .lb-stage img, .lb-stage video {
   max-width: 100%; max-height: 100%;
   object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.7);
+  border-radius: var(--r-sm);
 }
 .lb-info {
-  padding: 12px 24px 22px;
+  padding: 12px 24px 24px;
   display: flex; align-items: flex-start; gap: 12px;
   max-width: 1000px; margin: 0 auto; width: 100%;
-  color: var(--fg-dim); font-size: 13px;
+  color: var(--lb-dim); font-size: 13px;
 }
 /* 本文側のブロック。長い本文で flex アイテムが縮まないと省略が効かないので min-width: 0 が要る。 */
-.lb-info > div { min-width: 0; flex: 1; }
+.lb-body { min-width: 0; flex: 1; }
 .lb-info img.av { width: 36px; height: 36px; border-radius: 50%; flex: none; }
-.lb-info .who { color: var(--fg); font-weight: 700; }
-.lb-info .handle { color: var(--fg-faint); font-weight: 400; }
-.lb-info .txt { margin: 3px 0 6px; white-space: pre-wrap; word-break: break-word; color: var(--fg); }
+.lb-info .who { color: var(--lb-fg); font-weight: 600; }
+.lb-info .handle { color: var(--lb-dim); font-weight: 400; }
+.lb-info .txt { margin: 4px 0 8px; white-space: pre-wrap; word-break: break-word; color: var(--lb-fg); }
 .lb-info .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.lb-info .idx { color: var(--fg-faint); font-variant-numeric: tabular-nums; }
-.lb-info a { color: var(--accent); text-decoration: none; }
-.lb-info a:hover { text-decoration: underline; }
+/* 「1 / 240」。送るたびに桁が変わるので、等幅数字にして左右の揺れを止める。 */
+.lb-index { color: var(--lb-dim); font-variant-numeric: tabular-nums; }
+
 /* 保存はダウンロード API を呼ぶので button だが、隣の «X で開く» と並ぶので見た目はリンクに揃える。 */
 .aslink {
   padding: 0; border: 0; background: transparent;
   color: var(--accent); font: inherit;
 }
 .aslink:hover { background: transparent; border-color: transparent; text-decoration: underline; }
-.lb-close { position: absolute; top: 14px; right: 16px; z-index: 2; }
-.lb-nav {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  width: 44px; height: 68px; font-size: 30px; line-height: 1;
-  background: rgba(20,24,31,.6); z-index: 2;
+
+/* 下部のリンク束。a と button が混じるが、.lb-link の中身は 3 つともアイコン 1 つになった。
+   揃える必要が残っているのは縦位置だけである。素の a は inline なのでアイコンが文字の
+   ベースラインに乗るのに対し、button は大域の inline-flex で中央に置かれるため、
+   .lb-link 側で display: inline-flex と align-items: center を与えないと
+   「保存」のアイコンだけ数 px 上にずれる。
+   下の gap: 16px はこの束の中の間隔で、字を持つ閲覧数・寸法・件数との間にはいまも効く。 */
+.lb-links { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+/* 字が消えてアイコン 1 つ（15px）になった。padding が無いと 15px 角の的しか残らないので、
+   ここで 31px 角まで広げる。上下は margin で戻し、隣に並ぶ閲覧数や寸法の行を厚くしない。 */
+.lb-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px; margin: -8px 0; border: 0; background: transparent;
+  color: var(--lb-dim); font: inherit; text-decoration: none;
 }
-.lb-nav.prev { left: 10px; }
-.lb-nav.next { right: 10px; }
+/* 的を広げたぶん、アイコンどうしは 16px の gap から詰める。離れたままだと 3 つが
+   ひと束に見えず、押せる範囲も判らない。 */
+.lb-link + .lb-link { margin-left: -8px; }
+.lb-link:hover { background: transparent; color: var(--lb-fg); text-decoration: underline; }
+
+/* 墨地では藍鼠も蘇芳も沈むので、押した状態の色はアイコンにだけ効かせ、
+   添える数字は地の色のままにして読めるようにする。 */
+.lb-actions .act { color: var(--lb-dim); }
+.lb-actions .act:hover { background: var(--lb-line); color: var(--lb-fg); }
+.lb-actions .act .n { color: var(--lb-dim); }
+
+/* 囲みは持たせない。狭い画面では .lb-stage の余白が縮む一方でボタンの位置は据え置きなので、
+   枠があると写真の上に線が乗る。墨地の --lb-fg のアイコンだけで十分読め、
+   押せることはホバーの地が伝える。罫を透明にするのは、大域の button が --line を持つため。 */
+.lb-close, .lb-nav {
+  position: absolute;
+  z-index: 2;
+  background: transparent;
+  border-color: transparent;
+  color: var(--lb-fg);
+}
+/* ホバーの地は罫と同じ薄い白。墨地に対して 1 段だけ持ち上げる。
+   字色を明示するのは、.lb-close が併せ持つ .icon-btn の :hover が生成り地向けの
+   --fg を当ててきて、墨地の上に墨文字（1.30:1）が出るのを止めるため。 */
+.lb-close:hover, .lb-nav:hover { background: var(--lb-line); border-color: transparent; color: var(--lb-fg); }
+.lb-close { top: 16px; right: 16px; width: 36px; height: 36px; padding: 0; }
+.lb-nav {
+  top: 50%; transform: translateY(-50%);
+  width: 44px; height: 64px; padding: 0;
+}
+.lb-nav .ic { font-size: 20px; }
+.lb-nav.prev { left: 12px; }
+.lb-nav.next { right: 12px; }
+
+/* ── 画面幅ごとの調整 ─────────────────────── */
+/* タブはどの幅でもアイコンだけなので、幅で切り替えるものは無くなった。
+   入力欄の下限を上げるのは、.query が「入力欄 + 読み込む」の 2 つを抱えているため。
+   下限が低いとボタンの幅だけが残り、入力欄が虫眼鏡だけの箱に潰れる。
+   下限に達した .query は折り返して次の段を丸ごと使うので、ヘッダが 2 段でも 3 段でも成り立つ。 */
+@media (max-width: 760px) {
+  .query { min-width: 240px; }
+}
 
 @media (max-width: 640px) {
-  /* 狭い画面ではヘッダが 2 段に折り返すので、ツールバーの吸着位置を下げる。 */
-  .toolbar { top: 97px; }
+  .bar { gap: 8px 12px; padding: 8px 12px; }
+  main { padding: 12px; }
+  /* 閉じるは .sheet の padding に合わせて浮かせてあるので、padding を詰めたらこちらも寄せる。 */
+  .sheet { padding: 16px; }
+  .sheet header .icon-btn { top: 16px; right: 16px; }
   .lb-stage { padding: 16px 8px 4px; }
+  .lb-info { padding: 12px 16px 16px; }
   .lb-nav { width: 36px; height: 56px; }
+}
+
+/* 動きを減らす設定では、タイルの移動・入場と待機の回転を止める。 */
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; animation: none; }
+  .spinner { animation: none; }
 }

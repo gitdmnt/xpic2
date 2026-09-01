@@ -1,13 +1,16 @@
 // ツールバーとインストール画面に出すアイコンを、その場で描いて PNG にする。
 //
 // 画像をリポジトリに置かないのは、色を変えたときに描き直し忘れた差分が残らないようにするため。
-// 図柄は画面のヘッダのロゴと同じで、masonry の列を 4 つの矩形で表している。
+// 図柄は masonry の列を 4 つの矩形で表している。画面のヘッダのロゴは藍鼠の四角 1 つで、こちらとは別物。
+// 同じ図柄を index.html の favicon にも直書きしてあるので、色を変えるときは両方を揃える。
 
 import { deflateSync } from 'node:zlib';
 
-const BG: RGB = [0x11, 0x14, 0x1a];
-const ACCENT: RGB = [0x6e, 0xe7, 0xff];
-const ACCENT2: RGB = [0xa7, 0x8b, 0xfa];
+// 地だけは生成りに寄せず墨のまま残す。ブラウザのツールバーは明暗どちらもあり得るので、
+// 明るい地にすると明色のツールバーの上でアイコンの輪郭が消える。
+const BG: RGB = [0x2b, 0x28, 0x22];
+const ACCENT: RGB = [0xf4, 0xf1, 0xe8]; // 生成り
+const ACCENT2: RGB = [0x8f, 0xa3, 0xb8]; // 藍鼠。墨地の上で読めるよう画面の --accent より明度を上げてある
 
 type RGB = [number, number, number];
 

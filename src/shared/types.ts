@@ -98,7 +98,12 @@ export interface ActionRequest {
 
 /** 画面の表示設定。localStorage に保存する。 */
 export interface Options {
-  colWidth: number;
+  /**
+   * masonry の列数。0 は「自動」で、画面幅から詰め込める本数を決める。
+   * 列「幅」ではなく列「数」を持つのは、同じ設定でも画面の広さで見え方が変わるのを避けるため。
+   * 幅を指定すると、広い画面では列が増えて 1 枚が小さいまま、狭い画面では 1 列に潰れる。
+   */
+  columns: number;
   photos: boolean;
   videos: boolean;
   gifs: boolean;
@@ -109,7 +114,7 @@ export interface Options {
 }
 
 export const DEFAULT_OPTIONS: Options = {
-  colWidth: 290,
+  columns: 0,
   photos: true,
   videos: true,
   gifs: true,

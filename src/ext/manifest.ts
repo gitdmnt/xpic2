@@ -22,7 +22,9 @@ export function manifest(target: Target, version: string): Record<string, unknow
     description: 'X の画像付きポストだけを masonry で並べて眺めるビューア。',
     // cookies は x-csrf-token に使う ct0 を読むため、webRequest は queryId を観測するため。
     // downloads は原寸の保存、storage は queryId の上書きの保管に使う。
-    permissions: ['storage', 'cookies', 'downloads', 'webRequest'],
+    // clipboardWrite は共有ボタンの URL コピー。押した瞬間の操作から呼ぶので本来は要らないが、
+    // 利用者が押してから応答が返るまでの間に操作の有効期限が切れると拒否されるため、明示して塞ぐ。
+    permissions: ['storage', 'cookies', 'downloads', 'webRequest', 'clipboardWrite'],
     host_permissions: HOST_PERMISSIONS,
     icons: ICONS,
     action: { default_title: 'xpic2 を開く', default_icon: ICONS },

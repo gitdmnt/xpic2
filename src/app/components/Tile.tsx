@@ -2,8 +2,9 @@ import { memo, useEffect, useRef, useState } from 'react';
 import type { Media, Tweet, TweetAction } from '../../shared/types';
 import type { Placement } from '../hooks/useMasonry';
 import type { TweetActionState } from '../hooks/useTweetActions';
-import { compact, mediaUrl } from '../lib/format';
+import { mediaUrl } from '../lib/format';
 import { ActionBar } from './ActionBar';
+import { Icon, type IconName } from './Icon';
 
 /**
  * メタ行の高さ。style.css の `.meta { height: 34px }` と一致していなければ
@@ -24,13 +25,38 @@ interface TileProps {
   onAction(tweet: Tweet, action: TweetAction): void;
 }
 
-/** 右上バッジの文言。動画は秒数、GIF は種別、グループは残り枚数を示す。 */
-function badgeLabels(media: Media, groupCount: number): string[] {
-  const labels: string[] = [];
-  if (media.type === 'video') labels.push(media.durationMs ? `▶ ${Math.round(media.durationMs / 1000)}s` : '▶');
-  if (media.type === 'animated_gif') labels.push('GIF');
-  if (groupCount > 1) labels.push(`+${groupCount - 1}`);
-  return labels;
+/**
+ * 右上バッジ 1 つ分。
+ * ▶ と GIF をアイコンにしたので、文字列の配列では表せなくなった。
+ * 枚数（+2）だけは数なのでアイコンに置き換えられず、文字のまま残す。
+ */
+interface Badge {
+  /** React の key。種別ごとに 1 つしか出ないので種別名で足りる。 */
+  key: string;
+  icon?: IconName;
+  text?: string;
+  /**
+   * 読み上げでの名前。Icon は aria-hidden なので、GIF のように文字を伴わないバッジは
+   * これが無いと中身の空の要素になり、種別がまるごと伝わらない。
+   */
+  label: string;
+}
+
+/** 右上バッジ。動画は秒数、GIF は種別、グループは残り枚数を示す。 */
+function badges(media: Media, groupCount: number): Badge[] {
+  const list: Badge[] = [];
+  if (media.type === 'video') {
+    const seconds = media.durationMs ? Math.round(media.durationMs / 1000) : null;
+    list.push({
+      key: 'video',
+      icon: 'play',
+      text: seconds === null ? undefined : `${seconds}s`,
+      label: seconds === null ? '動画' : `動画 ${seconds} 秒`,
+    });
+  }
+  if (media.type === 'animated_gif') list.push({ key: 'gif', icon: 'gif', label: 'GIF' });
+  if (groupCount > 1) list.push({ key: 'group', text: `+${groupCount - 1}`, label: `ほか ${groupCount - 1} 枚` });
+  return list;
 }
 
 export const Tile = memo(function Tile({
@@ -83,7 +109,7 @@ export const Tile = memo(function Tile({
     }
   }, [playing]);
 
-  const labels = badgeLabels(media, groupCount);
+  const badgeList = badges(media, groupCount);
 
   return (
     <article
@@ -123,22 +149,41 @@ export const Tile = memo(function Tile({
             style={playing ? undefined : { display: 'none' }}
           />
         )}
-        {labels.length > 0 && (
+        {badgeList.length > 0 && (
           <div className="badge">
-            {labels.map((t) => (
-              <span key={t}>{t}</span>
+            {badgeList.map((b) => (
+              // role="img" で 1 つの図として名前を与える。中の記号ではなく label が読まれる。
+              <span key={b.key} role="img" aria-label={b.label}>
+                {b.icon ? <Icon name={b.icon} /> : null}
+                {b.icon && b.text ? ' ' : null}
+                {b.text}
+              </span>
             ))}
           </div>
         )}
-        {tweet.sensitive && <div className="sensitive-tag">センシティブ</div>}
-        <ActionBar tweet={tweet} state={action} onAction={onAction} className="tile-actions" />
+        {/* 「センシティブ」の字はアイコン 1 つに畳んだ。Icon は aria-hidden なので、
+            role="img" と aria-label が無いと中身の空の要素になり、警告そのものが消える。
+            title は、絵だけでは伝わらない利用者のためにホバーで語を出す。 */}
+        {tweet.sensitive && (
+          <div className="sensitive-tag" role="img" aria-label="センシティブ" title="センシティブ">
+            <Icon name="hidden" />
+          </div>
+        )}
+        {/* 操作ボタンの居場所はメタ行だが、情報を表示を切ると行ごと消える。
+            そのときだけ従来どおり画像に重ねて、押す手段が無くなるのを防ぐ。 */}
+        {!showMeta && <ActionBar tweet={tweet} state={action} onAction={onAction} share className="tile-actions" />}
       </div>
       {showMeta && (
         <div className="meta">
+          {/* 名前が見える字に戻ったので、アバターの alt は空にする。
+              同じ語を alt と字の両方に置くと、読み上げで投稿者名が二度続く。
+              長い名前は省略記号で切れるため、全体を読む手段として title は字の側に残す。 */}
           <img src={tweet.user.avatar} alt="" loading="lazy" />
-          <span className="name">{tweet.user.name}</span>
-          {/* 押した結果を映すため、取得時の値ではなく楽観更新後の統計を出す。 */}
-          <span className="likes">♥ {compact((action?.stats ?? tweet.stats).likes)}</span>
+          <span className="name" title={tweet.user.name}>
+            {tweet.user.name}
+          </span>
+          {/* いいね数はボタン自身が持つ（counts="like"）。別に ♥ を並べるとハートが二つになる。 */}
+          <ActionBar tweet={tweet} state={action} onAction={onAction} counts="like" share className="meta-actions" />
         </div>
       )}
     </article>
