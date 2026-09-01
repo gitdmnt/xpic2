@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/app/main.tsx", "test/**/*.test.ts"],
+  "entry": ["src/ext/background.ts", "test/**/*.test.ts"],
   "project": ["src/**/*.{ts,tsx}", "test/**/*.ts"],
   "tags": ["-public"]
 }

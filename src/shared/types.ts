@@ -1,4 +1,4 @@
-// クライアントとサーバで共有する型。API の契約はここが唯一の正。
+// 取得層（src/x）と画面（src/app）で共有する型。両者の契約はここが唯一の正。
 
 export type MediaType = 'photo' | 'video' | 'animated_gif';
 
@@ -72,7 +72,7 @@ export interface Filters {
   replies: boolean;
 }
 
-/** GET /api/timeline のレスポンス。 */
+/** タイムライン 1 回分の取得結果。 */
 export interface TimelineResponse {
   items: Tweet[];
   cursor: string | null;
@@ -88,52 +88,12 @@ export interface TimelineResponse {
  */
 export type TweetAction = 'like' | 'retweet' | 'bookmark';
 
-/** POST /api/action のリクエスト。on が真なら実行、偽なら取り消し。 */
+/** 操作 1 回分の指定。on が真なら実行、偽なら取り消し。 */
 export interface ActionRequest {
   /** ポストの id。リポストされたものは元ポストの id を指す。 */
   id: string;
   action: TweetAction;
   on: boolean;
-}
-
-/** POST /api/action のレスポンス。要求どおりに落ち着いた状態をそのまま返す。 */
-export interface ActionResponse {
-  ok: true;
-  id: string;
-  action: TweetAction;
-  on: boolean;
-}
-
-/** エラー時の共通ボディ。 */
-export interface ApiErrorBody {
-  error: string;
-  hint: string | null;
-}
-
-/** GET /api/config のレスポンス。認証情報そのものは含めない。 */
-export interface ConfigStatus {
-  configured: boolean;
-  cookieKeys: string[];
-  cookieLength: number;
-  bearerCustom: boolean;
-  queryIds: Record<string, string>;
-  featureCount: number;
-  extraHeaderKeys: string[];
-  file: string;
-}
-
-/** POST /api/config のリクエスト。 */
-export interface ConfigPatchRequest {
-  curl?: string;
-  cookie?: string;
-  bearer?: string;
-  queryIds?: Record<string, string>;
-}
-
-export interface ConfigSaveResponse {
-  ok: true;
-  note: string | null;
-  status: ConfigStatus;
 }
 
 /** 画面の表示設定。localStorage に保存する。 */

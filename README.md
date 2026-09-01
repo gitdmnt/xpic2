@@ -1,42 +1,53 @@
 # xpic2
 
-X（Twitter）の内部 GraphQL API を叩き、画像付きのポストだけを masonry レイアウトで並べるローカル Web アプリです。
+X（Twitter）の画像付きポストだけを masonry で並べて眺めるブラウザ拡張機能です。
 
-Bun + React + TypeScript で動きます。
-ブラウザから直接 X の API を呼ぶと CORS と cookie の制約で失敗するため、Bun のローカルサーバが中継します。
+Chrome と Firefox で動きます。
+X の内部 GraphQL API を叩きますが、認証はブラウザが持っている x.com のセッションをそのまま使うので、cookie を貼り付ける手順はありません。
 
-## 起動
+## 導入
 
 ```bash
-bun install && bun start
+bun install && bun run build
 ```
 
-`http://127.0.0.1:5173` が開けるようになります。
-ポートは `PORT=8080 bun start` のように変更できます。
+`dist/` が拡張機能の本体になります。
 
-開発中は `bun dev` を使うと、フロントエンドの変更がホットリロードされます。
+Chrome と Edge では、`chrome://extensions` でデベロッパーモードを有効にし、「パッケージ化されていない拡張機能を読み込む」から `dist/` を選びます。
 
-## 接続設定
+Firefox では `bun run build:firefox` で組み直してから、`about:debugging#/runtime/this-firefox` の「一時的なアドオンを読み込む」で `dist/manifest.json` を選びます。
+一時的なアドオンは Firefox を終了すると消えます。
+恒久的に入れるには署名が要ります。
 
-初回は認証情報が無いため、設定画面が自動で開きます。
+ツールバーのアイコンを押すと、タブとして開きます。
 
-1. x.com にログインしたブラウザで DevTools を開き、Network タブを表示します。
-2. 誰かのプロフィールの「メディア」タブを開き、`i/api/graphql/…/UserMedia` のリクエストを探します。
-3. そのリクエストを右クリックし、Copy → Copy as cURL を選びます。
-4. xpic2 の設定画面のテキストエリアに貼り付け、保存します。
+## 開発中の組み直し
 
-cURL からは cookie・bearer・queryId・features をまとめて読み取ります。
+```bash
+bun run watch
+```
 
-このうち queryId と features は「上書き指定」として保存されます。
-既定値は twitter-openapi-typescript が x.com から取得するので、普段は cookie を入れるだけで動きます。
-cURL を貼り直すのは、その既定値が古びて「queryId が古くなっています」と表示されたときです。
-エラーに出た名前のリクエストを貼れば、そのエンドポイントの分だけが差し替わります。
+`src/` の保存を拾って `dist/` を組み直します。
+反映はブラウザ側の再読み込みで行います。
+画面だけを直したときは xpic2 のタブを再読み込みすれば足り、`src/ext/` と manifest を直したときは拡張機能そのものを再読み込みします（Chrome は `chrome://extensions` の再読み込みボタン、Firefox は `about:debugging` の「再読み込み」）。
 
-cookie だけを直接貼る方法もあります。
-その場合は `auth_token` と `ct0` の両方が必要です。
+保存しただけで自動的に反映される仕組みは入れていません。
+それには拡張機能へ再読み込みを指示する常駐プロセスが要り、サーバを無くしたことがこの構成の出発点だからです。
 
-認証情報は `config.json`（パーミッション 600）にのみ保存され、外部へは送信されません。
-`.gitignore` 済みです。
+## 使い方
+
+x.com にログインしていれば、それだけで動きます。
+
+Firefox の MV3 ではホスト権限が既定で保留されるため、初回は設定画面の「権限を許可」を押す必要があります。
+Chrome では導入時に許可されます。
+
+- 取得元のタブを選び、ユーザー名か検索語を入れて「読み込む」を押します。
+- 列幅スライダで列数が変わります（コンテナ幅から自動で列数を決めます）。
+- 画像 / 動画 / GIF / RT のチェックで取得対象を絞ります。切り替えると読み直します。
+- 「複数画像を分割」を切ると、1 投稿を 1 タイルにまとめます。
+- タイルをクリックで拡大表示、`←` `→` で移動、`Esc` で閉じます。
+- `/` で検索欄にフォーカスします。
+- 下端に近づくと自動で次のページを読み込みます。
 
 ## 取得元
 
@@ -53,15 +64,6 @@ cookie だけを直接貼る方法もあります。
 
 「おすすめ」と「フォロー中」は x.com のホームの 2 つのタブに対応します。
 前者は X のアルゴリズム順、後者はフォローしている人の時系列順です。
-
-## 操作
-
-- 列幅スライダで列数が変わります（コンテナ幅から自動で列数を決めます）。
-- 画像 / 動画 / GIF / RT のチェックで取得対象を絞ります。切り替えると読み直します。
-- 「複数画像を分割」を切ると、1 投稿を 1 タイルにまとめます。
-- タイルをクリックで拡大表示、`←` `→` で移動、`Esc` で閉じます。
-- `/` で検索欄にフォーカスします。
-- 下端に近づくと自動で次のページを読み込みます。
 
 ## いいね・リポスト・ブックマーク
 
@@ -80,8 +82,15 @@ X 側の操作がポストにしか掛からないためで、1 投稿を複数�
 | リポスト | `CreateRetweet` | `DeleteRetweet` |
 | ブックマーク | `CreateBookmark` | `DeleteBookmark` |
 
-取得元と同じく、これらも queryId のローテーションで 404 になることがあります。
-エラーに出た名前のリクエストを x.com の DevTools で Copy as cURL して設定画面に貼れば、その分だけ差し替わります。
+## queryId の追従
+
+X は GraphQL の queryId を随時ローテーションさせます。
+表を同梱しても必ず古びるので、この拡張機能は本人の x.com のタブが実際に投げているリクエストを観測し、queryId と features をそのまま拾います（`src/ext/background.ts`）。
+x.com を普通に使っているうちに追いつくので、普段は何もしなくて構いません。
+
+拾えるのは、その操作を x.com 側で一度でも行った分だけです。
+届かないエンドポイントで「queryId が古くなっています」と出たときは、設定画面の「queryId を手で差し替える」に、そのリクエストの Copy as cURL を貼ります。
+読み取るのは queryId と features だけで、cookie や bearer は取り込みません。
 
 ## 構成
 
@@ -89,43 +98,63 @@ X への取得は [twitter-openapi-typescript](https://www.npmjs.com/package/twi
 GraphQL のリクエスト組み立てとレスポンスの型付けはライブラリ側の仕事で、このリポジトリには持ちません。
 
 ```
-server.ts                  Bun.serve のエントリ。HTML を import すると Bun が React を自動でバンドルする
-src/shared/types.ts        クライアントとサーバが共有する型。API の契約はここが唯一の正
-src/server/config.ts       設定の保存と cURL 解析。queryId / features の上書き指定を持つ
-src/server/x-client.ts     ライブラリのクライアント生成と、queryId / features の上書き適用
-src/server/x-api.ts        取得元ごとの呼び分けとページング
-src/server/x-post.ts       いいね / リポスト / ブックマークの実行と取り消し
-src/server/x-error.ts      ライブラリの例外を画面に出せる形へ写す。取得と操作で共有する
-src/server/map.ts          ライブラリのモデルから Tweet / Media への変換とフィルタ
+build.ts                   dist/ の組み立て。manifest とアイコンもここで作る
+src/shared/types.ts        取得層と画面が共有する型。契約はここが唯一の正
+src/ext/browser.ts         Chrome と Firefox の拡張 API の差を吸収する
+src/ext/background.ts      x.com のリクエストを観測して queryId を拾う
+src/ext/manifest.ts        manifest の組み立て。Chrome と Firefox の差分だけを持つ
+src/ext/icons.ts           アイコンをその場で描いて PNG にする
+src/ext/buffer.ts          署名生成が使う Node の Buffer の穴埋め
+src/x/client.ts            クライアント生成、権限とログインの確認、queryId の上書き適用
+src/x/flags.ts             queryId / features の上書きの保管と、URL・cURL の解析
+src/x/timeline.ts          取得元ごとの呼び分けとページング
+src/x/actions.ts           いいね / リポスト / ブックマークの実行と取り消し
+src/x/error.ts             失敗を画面に出せる形へ写す。取得と操作で共有する
+src/x/map.ts               ライブラリのモデルから Tweet / Media への変換とフィルタ
 src/app/                   React の画面
-test/                      bun test（x-client / map / x-post / cURL 解析）
+test/                      bun test
 ```
 
-設計上の要点は 4 つです。
+設計上の要点は 5 つです。
+
+**認証情報を持ちません。**
+x.com へのリクエストにはブラウザが自分の cookie を載せます。
+こちらが用意するのは `x-csrf-token` だけで、これは HttpOnly でない `ct0` から作ります（`src/x/client.ts`）。
+`auth_token` は読みませんし、保存もしません。
+
+**ライブラリの fetch を差し替えています。**
+既定の fetch は credentials が same-origin なので、`chrome-extension://` のページから x.com を叩いても cookie が載りません。
+`TwitterOpenApi.fetchApi` を置き換えて、x.com 宛のときだけ `credentials: 'include'` を足しています。
+ライブラリはそのあと `cookie` ヘッダを自分で立てますが、これは禁止ヘッダ名なのでブラウザに落とされます。落とされて正しく、載るのはブラウザが持つ本物です。
 
 **既定値はライブラリ、上書きだけこちらが持ちます。**
 queryId と features の既定値は、ライブラリが実行時に取得する `placeholder.json` が唯一の出どころです。
 このリポジトリに既定値の表はありません。
-設定画面に貼られた cURL から取れた値だけが上書きとして `config.json` に載り、クライアント生成時に該当分を差し替えます（`src/server/x-client.ts`）。
-上書きが 0 件なら、ライブラリの既定値がそのまま効きます。
+観測と cURL で得た値だけが上書きとして `storage.local` に載り、クライアント生成時に該当分を差し替えます。
 
 **queryId は 2 か所に効きます。**
 リクエスト URL のパスと、`x-client-transaction-id` の署名の両方が queryId から作られます。
 片方だけ直すと署名がパスと食い違って弾かれるので、上書きは必ず両方へ書き込みます。
-
-**操作だけはライブラリのユーティリティを迂回します。**
-取得は `TweetApiUtils` に任せていますが、いいね等は生成 API を直接叩いています（`src/server/x-post.ts`）。
-`PostApiUtils` はブックマークの作成と削除を持たず、生成 API を呼ぶときに `initOverrides` を渡さないため `x-client-transaction-id` が付きません。
-どちらもこちら側からは塞げないので、リクエストの組み立てだけを引き受け、署名は同じ `initOverrides` から借りています。
 
 **masonry の配置は画像の実寸から計算します。**
 `originalInfo` の幅と高さを使うので、画像の読み込みを待たずに高さを確定でき、レイアウトのがたつきが起きません。
 ただしライブラリの生成モデルは実行時検証をせず、X が値を落とせば `undefined` が流れてきます。
 `Number.isFinite` で検証し、駄目なら `sizes` やアスペクト比で補います。
 
+## 権限
+
+| 権限 | 用途 |
+| --- | --- |
+| `https://x.com/*` `https://api.x.com/*` | 取得と操作。cookie もこの権限があってはじめて載る |
+| `https://raw.githubusercontent.com/*` | queryId と features の既定値、署名鍵の取得（ライブラリが行う） |
+| `cookies` | `x-csrf-token` に使う `ct0` を読む |
+| `webRequest` | x.com のリクエストを観測して queryId を拾う |
+| `storage` | queryId / features の上書きの保管 |
+| `downloads` | 原寸の保存 |
+
 ## 制約
 
-- 非公開 API のため、queryId のローテーションで動かなくなることがあります。「queryId が古くなっています」と出たら、そのエンドポイントの cURL を貼り直して上書きしてください。
+- 非公開 API のため、queryId のローテーションで一時的に動かなくなることがあります。x.com を開いて該当の操作を行うか、cURL を貼ると塞げます。
 - レート制限があります。429 が返ったら待ち時間が画面に表示されます。
 - 画像や動画を含むポストだけを扱います。メディアの無いポストは表示しません。
 - リポストは元ポストとして扱い、リポストした人を添えて表示します。引用ポストの引用元の画像は取り込みません。

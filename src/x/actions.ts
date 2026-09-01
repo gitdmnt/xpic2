@@ -9,13 +9,13 @@
 // cookie・csrf・bearer は Configuration のミドルウェアが面倒を見るので、ここには出てこない。
 //
 // queryId の出どころは取得側とまったく同じで、既定値は placeholder.json、
-// 上書きは設定画面に貼られた cURL だけ。ここに ID の表は無い。
+// 上書きは background.ts が観測した分だけ。ここに ID の表は無い。
 
 import type { TwitterOpenApiClient } from 'twitter-openapi-typescript';
 
 import type { TweetAction } from '../shared/types.ts';
-import { ApiError, getClient } from './x-client.ts';
-import { queryIdOf, toApiError } from './x-error.ts';
+import { getClient } from './client.ts';
+import { ApiError, queryIdOf, toApiError } from './error.ts';
 
 /** 生成 API の型。package.json の依存に無い生成パッケージを import せずに済むよう client から辿る。 */
 type PostApi = ReturnType<TwitterOpenApiClient['getPostApi']>['api'];

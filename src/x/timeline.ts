@@ -1,22 +1,17 @@
 // 取得は twitter-openapi-typescript に任せ、このファイルは
-// 「どのエンドポイントを叩くか」「何ページ進むか」「失敗をどう案内するか」だけを持つ。
+// 「どのエンドポイントを叩くか」「何ページ進むか」だけを持つ。
 //
-// 自前の GraphQL 呼び出し(旧実装)は廃止した。queryId と features の既定値は
-// ライブラリが実行時に取得する placeholder.json が供給し、設定画面に貼られた cURL の分だけを
-// src/server/x-client.ts の applyOverrides が上書きする。
+// queryId と features の既定値はライブラリが実行時に取得する placeholder.json が供給し、
+// background.ts が観測した分だけを client.ts の applyOverrides が上書きする。
 // したがってここには URL も features もヘッダも出てこない。
 
 import type { TimelineApiUtilsResponse, TweetApiUtilsData } from 'twitter-openapi-typescript';
 
 import type { Filters, Source, TimelineResponse, Tweet } from '../shared/types.ts';
 import { filterItems, mapTimeline } from './map.ts';
-import { ApiError, getClient } from './x-client.ts';
-// 例外の日本語化は操作(x-post.ts)と共有するので x-error.ts に置いてある。
-import { queryIdOf, toApiError } from './x-error.ts';
-
-// server.ts は x-api.ts から ApiError を受け取る契約なので、実体は x-client.ts のまま再 export する。
-// 同じクラスを共有していないと server.ts の instanceof が外れる。
-export { ApiError } from './x-client.ts';
+import { getClient } from './client.ts';
+// 例外の日本語化は操作(actions.ts)と共有するので error.ts に置いてある。
+import { ApiError, queryIdOf, toApiError } from './error.ts';
 
 /**
  * ソースと GraphQL オペレーション名の対応。

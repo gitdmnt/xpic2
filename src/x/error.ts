@@ -1,11 +1,27 @@
-// ライブラリが投げた例外を、画面にそのまま出せる ApiError へ写す。
+// X の失敗を、画面にそのまま出せる形へ写す。
 //
-// 取得（x-api.ts）と操作（x-post.ts）で同じ言い回しを使いたいのでここに切り出してある。
+// 取得（timeline.ts）と操作（actions.ts）で同じ言い回しを使いたいのでここに置いてある。
 // 「どのエンドポイントで」「どの queryId で」失敗したかを名指しできることが要件で、
-// それが無いと利用者はどのリクエストを Copy as cURL すればよいか分からない。
+// それが無いと利用者はどのリクエストを見に行けばよいか分からない。
 
 import type { TwitterOpenApiClient } from 'twitter-openapi-typescript';
-import { ApiError } from './x-client.ts';
+
+/**
+ * 画面に出す失敗。
+ * status は X が返した HTTP ステータス（届かなかったときは 0）。
+ * 401 なら再ログインへ、404 なら queryId の更新へ、と画面側が分岐するために持つ。
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly hint: string | null;
+
+  constructor(status: number, message: string, hint: string | null = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.hint = hint;
+  }
+}
 
 /**
  * fetch の Response らしきもの。
@@ -68,13 +84,12 @@ function retryAfterSeconds(res: ResponseLike | null): number | null {
 
 /**
  * ライブラリの例外を ApiError へ写す。
- * ここが移植で最も価値のある部分なので、旧実装の日本語の案内をそのまま引き継いでいる。
  *
  * @param endpoint 失敗した GraphQL オペレーション名。404 の案内で名指しする。
  * @param queryId  そのとき使っていた queryId。手元の値と DevTools の値を突き合わせられるように出す。
  */
 export function toApiError(e: unknown, endpoint: string, queryId: string | null): ApiError {
-  // getClient() が投げる認証未設定などの案内は、すでに整形済みなのでそのまま通す。
+  // getClient() が投げる未ログインなどの案内は、すでに整形済みなのでそのまま通す。
   if (e instanceof ApiError) return e;
 
   const res = digResponse(e);
@@ -84,7 +99,7 @@ export function toApiError(e: unknown, endpoint: string, queryId: string | null)
     return new ApiError(
       res.status,
       'X に認証を拒否されました。',
-      'cookie(auth_token / ct0)が失効している可能性があります。設定を貼り直してください。',
+      'x.com のセッションが切れている可能性があります。x.com を開き直してログインし直してください。',
     );
   }
 
@@ -94,7 +109,7 @@ export function toApiError(e: unknown, endpoint: string, queryId: string | null)
       queryId
         ? `${endpoint} の queryId (${queryId}) が古くなっています。`
         : `${endpoint} の queryId が古くなっています。`,
-      `x.com の DevTools で ${endpoint} のリクエストを Copy as cURL して設定画面に貼ると更新できます。`,
+      `x.com のタブで ${endpoint} を発生させる操作を一度行うと、新しい値を拾って自動で塞ぎます。`,
     );
   }
 
@@ -112,9 +127,9 @@ export function toApiError(e: unknown, endpoint: string, queryId: string | null)
     return new ApiError(502, `X が ${endpoint} で HTTP ${res.status} を返しました。`, message.slice(0, 300) || null);
   }
   return new ApiError(
-    502,
+    0,
     `${endpoint} の呼び出しに失敗しました: ${message.slice(0, 300)}`,
-    'X への接続か、応答の解釈で失敗しています。cookie の失効や queryId / features のずれが疑われます。',
+    'x.com への接続か、応答の解釈で失敗しています。拡張機能に x.com への権限があるか確認してください。',
   );
 }
 

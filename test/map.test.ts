@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import type { TimelineApiUtilsResponse, TweetApiUtilsData } from 'twitter-openapi-typescript';
-import { filterItems, mapTimeline, mapTweet } from '../src/server/map.ts';
+import { filterItems, mapTimeline, mapTweet } from '../src/x/map.ts';
 import type { Tweet } from '../src/shared/types.ts';
 
 type Json = Record<string, unknown>;

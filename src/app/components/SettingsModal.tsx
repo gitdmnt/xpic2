@@ -1,13 +1,17 @@
-// 接続設定モーダル。cURL / cookie を保存し、現在の設定状況を表示する。
+// 接続設定モーダル。
+//
+// サーバ版と役目が変わっている。cookie を貼る欄は無い。認証はブラウザの x.com のセッションを
+// そのまま使うので、ここで確かめるのは「権限が下りているか」と「ログインしているか」だけである。
+// queryId の上書きも background.ts が勝手に集めるため、cURL 欄はその手当が届かないときの控えとして残す。
 
 import { useCallback, useEffect, useState } from 'react';
-import type { ConfigPatchRequest, ConfigStatus } from '../../shared/types.ts';
-import { fetchConfigStatus, saveConfig } from '../lib/api.ts';
+import type { ExtStatus } from '../lib/x.ts';
+import { applyCurl, clearOverrides, extStatus, requestPermissions } from '../lib/x.ts';
 
 export interface SettingsModalProps {
   open: boolean;
   onClose(): void;
-  onSaved(status: ConfigStatus): void;
+  onChanged(status: ExtStatus): void;
 }
 
 interface Message {
@@ -15,143 +19,175 @@ interface Message {
   bad: boolean;
 }
 
-/**
- * 認証情報そのものは持たないので、状況は素朴なテキストで並べる。
- *
- * queryId と features はライブラリの既定値に対する「上書き」であって、実際に使われる値の全量ではない。
- * 一覧をそのまま並べると既定値と読み違えるので、上書きが 0 件のときは件数ではなくその旨を書く。
- */
-function formatStatus(s: ConfigStatus): string {
-  const ops = Object.entries(s.queryIds);
-  const queryLines =
-    ops.length === 0
-      ? 'queryId の上書き: なし（既定値のみ）'
-      : `queryId の上書き: ${ops.length} 件\n` + ops.map(([k, v]) => `  ${k}: ${v}`).join('\n');
-  const featureLine =
-    s.featureCount === 0
-      ? 'features の上書き: なし（既定値のみ）'
-      : `features の上書き: ${s.featureCount} 件`;
-
-  return (
-    `認証: ${s.configured ? 'OK' : '未設定'}\n` +
-    `cookie の項目: ${s.cookieKeys.join(', ') || '(なし)'}\n` +
-    `${queryLines}\n` +
-    `${featureLine}\n` +
-    `保存先: ${s.file}`
-  );
-}
-
-export function SettingsModal({ open, onClose, onSaved }: SettingsModalProps) {
+export function SettingsModal({ open, onClose, onChanged }: SettingsModalProps) {
   const [curl, setCurl] = useState('');
-  const [cookie, setCookie] = useState('');
   const [msg, setMsg] = useState<Message | null>(null);
-  const [statusText, setStatusText] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<ExtStatus | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // 開くたびに取り直す。保存直後だけでなく、他の経路で config.json が変わった場合にも追随するため。
+  const refresh = useCallback(async (): Promise<ExtStatus | null> => {
+    try {
+      const s = await extStatus();
+      setStatus(s);
+      onChanged(s);
+      return s;
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : '状況を取得できませんでした。', bad: true });
+      return null;
+    }
+  }, [onChanged]);
+
+  // 開くたびに取り直す。権限は拡張機能の管理画面からも変えられるので、こちらの記憶は当てにしない。
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    fetchConfigStatus().then(
-      (s) => { if (!cancelled) setStatusText(formatStatus(s)); },
-      () => { if (!cancelled) setStatusText('サーバに接続できません。'); },
-    );
-    return () => { cancelled = true; };
-  }, [open]);
+    void refresh();
+  }, [open, refresh]);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const handleSave = useCallback(async () => {
-    const c = curl.trim();
-    const ck = cookie.trim();
-    if (!c && !ck) {
-      setMsg({ text: 'cURL か cookie を入力してください。', bad: true });
+  const handleGrant = useCallback(async () => {
+    setBusy(true);
+    try {
+      const ok = await requestPermissions();
+      setMsg(
+        ok
+          ? { text: '許可されました。', bad: false }
+          : { text: '許可されませんでした。', bad: true },
+      );
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh]);
+
+  const handleCurl = useCallback(async () => {
+    const text = curl.trim();
+    if (!text) {
+      setMsg({ text: 'cURL を貼り付けてください。', bad: true });
       return;
     }
-    const body: ConfigPatchRequest = {};
-    if (c) body.curl = c;
-    if (ck) body.cookie = ck;
-
-    setSaving(true);
-    setMsg({ text: '保存中…', bad: false });
+    setBusy(true);
     try {
-      const res = await saveConfig(body);
-      setMsg({ text: res.note ?? '保存しました。', bad: false });
-      // サーバが保存後の状況を返すので、取り直さずそのまま反映する
-      setStatusText(formatStatus(res.status));
-      setCurl(''); // cURL は使い捨て。cookie 欄は入力内容の確認用に残す
-      onSaved(res.status);
+      setMsg({ text: await applyCurl(text), bad: false });
+      setCurl('');
+      await refresh();
     } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : '保存に失敗しました。', bad: true });
+      setMsg({ text: e instanceof Error ? e.message : '取り込めませんでした。', bad: true });
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
-  }, [curl, cookie, onSaved]);
+  }, [curl, refresh]);
+
+  const handleClear = useCallback(async () => {
+    setBusy(true);
+    try {
+      await clearOverrides();
+      setMsg({ text: '上書きを消しました。以後はライブラリの既定値だけで動きます。', bad: false });
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh]);
 
   if (!open) return null;
+
+  const ops = Object.entries(status?.queryIds ?? {});
 
   return (
     <div
       className="modal"
       // オーバーレイ自身をクリックしたときだけ閉じる（シート内の操作で閉じない）
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="sheet">
         <header>
           <h2>接続設定</h2>
-          <button type="button" className="ghost" onClick={onClose}>閉じる</button>
+          <button type="button" className="ghost" onClick={onClose}>
+            閉じる
+          </button>
         </header>
 
         <p className="lede">
-          x.com にログインしたブラウザの DevTools →
-          <b>Network</b> タブで <code>i/api/graphql/…/UserMedia</code> のようなリクエストを右クリックし
-          <b>Copy as cURL</b>。貼り付けると cookie が登録され、そのリクエストの queryId と features が<b>上書き</b>として保存されます。
+          この拡張機能は、ブラウザが持っている x.com のセッションをそのまま使います。
+          cookie を貼り付ける必要はありません。x.com にログインしていれば、それだけで動きます。
         </p>
 
-        <p className="lede">
-          queryId と features の既定値はライブラリが x.com から取得するので、普段は cookie を入れるだけで動きます。
-          cURL を貼り直すのは、その既定値が古びて「queryId が古くなっています」と出たときです。
-          エラーに出た名前（<code>UserMedia</code> など）のリクエストを貼れば、そのエンドポイントの分だけを新しい queryId で塞げます。
-        </p>
-
-        <label className="field">
-          <span>cURL を貼り付け（cookie の登録と、古びた queryId の差し替え）</span>
-          <textarea
-            rows={6}
-            value={curl}
-            onChange={(e) => setCurl(e.currentTarget.value)}
-            placeholder="curl 'https://x.com/i/api/graphql/xxxx/UserMedia?variables=...' -H 'authorization: Bearer ...' -H 'cookie: auth_token=...; ct0=...' ..."
-          />
-        </label>
-
-        <details>
-          <summary>cookie だけを直接入力する</summary>
-          <label className="field">
-            <span>cookie ヘッダ全文（最低限 <code>auth_token</code> と <code>ct0</code>）</span>
-            <textarea
-              rows={3}
-              value={cookie}
-              onChange={(e) => setCookie(e.currentTarget.value)}
-              placeholder="auth_token=xxxxxxxx; ct0=yyyyyyyy"
-            />
-          </label>
-        </details>
+        <div className="statusbox">
+          <div className={status?.granted ? 'ok' : 'ng'}>
+            {status?.granted ? '● x.com への権限: あり' : '● x.com への権限: なし'}
+          </div>
+          <div className={status?.loggedIn ? 'ok' : 'ng'}>
+            {status?.loggedIn ? '● x.com のログイン: あり' : '● x.com のログイン: なし'}
+          </div>
+          <div>
+            {ops.length === 0
+              ? '● queryId の上書き: なし（既定値のみ）'
+              : `● queryId の上書き: ${ops.length} 件`}
+          </div>
+          {ops.map(([op, id]) => (
+            <div key={op} className="sub">
+              {op}: {id}
+            </div>
+          ))}
+          <div>
+            {status && status.featureCount > 0
+              ? `● features の上書き: ${status.featureCount} 件`
+              : '● features の上書き: なし（既定値のみ）'}
+          </div>
+        </div>
 
         <div className="actions">
-          {/* 二重送信で config.json を上書きし合わないよう、保存中は押させない */}
-          <button type="button" className="primary" onClick={handleSave} disabled={saving}>保存</button>
+          {status && !status.granted && (
+            <button type="button" className="primary" onClick={() => void handleGrant()} disabled={busy}>
+              権限を許可
+            </button>
+          )}
+          {status && status.granted && !status.loggedIn && (
+            <a className="msg" href="https://x.com/login" target="_blank" rel="noreferrer noopener">
+              x.com を開いてログイン
+            </a>
+          )}
           {msg && <span className={msg.bad ? 'msg bad' : 'msg'}>{msg.text}</span>}
         </div>
 
-        <div className="statusbox">{statusText}</div>
+        <details>
+          <summary>queryId を手で差し替える</summary>
+          <p className="lede">
+            queryId は x.com のタブが投げているリクエストを見て自動で追いかけます。
+            その操作を x.com 側で一度も行っていないと拾えないので、そのときだけここを使います。
+            DevTools の <b>Network</b> で、エラーに出た名前のリクエストを <b>Copy as cURL</b> して貼り付けてください。
+            読み取るのは queryId と features だけで、cookie や bearer は取り込みません。
+          </p>
+          <label className="field">
+            <span>cURL を貼り付け</span>
+            <textarea
+              rows={5}
+              value={curl}
+              onChange={(e) => setCurl(e.currentTarget.value)}
+              placeholder="curl 'https://x.com/i/api/graphql/xxxx/FavoriteTweet' ..."
+            />
+          </label>
+          <div className="actions">
+            <button type="button" onClick={() => void handleCurl()} disabled={busy}>
+              取り込む
+            </button>
+            <button type="button" className="ghost" onClick={() => void handleClear()} disabled={busy}>
+              上書きを全部消す
+            </button>
+          </div>
+        </details>
 
         <p className="fine">
-          認証情報はこの PC の <code>config.json</code>（権限 600）にだけ保存され、外部には送信されません。
+          保存するのは queryId と features の上書きだけで、認証情報は保存しません。
           X の非公開 API を叩くため、レート制限や仕様変更で動かなくなることがあります。自分のアカウントの範囲でご利用ください。
         </p>
       </div>

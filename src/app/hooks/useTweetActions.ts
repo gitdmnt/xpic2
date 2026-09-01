@@ -6,7 +6,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Tweet, TweetAction, TweetStats, TweetViewerState } from '../../shared/types.ts';
-import { ApiClientError, sendAction } from '../lib/api.ts';
+import { sendAction } from '../lib/x.ts';
 
 /** 操作 → 自分の状態を表す項目。ボタン側もこの対応を使う。 */
 export const VIEWER_FIELD: Record<TweetAction, keyof TweetViewerState> = {
@@ -71,7 +71,7 @@ function withDelta(tweet: Tweet, viewer: TweetViewerState): TweetStats {
 
 function failureMessage(e: unknown, action: TweetAction, on: boolean): string {
   const what = on ? LABEL[action] : `${LABEL[action]}の取り消し`;
-  const why = e instanceof ApiClientError || e instanceof Error ? e.message : String(e);
+  const why = e instanceof Error ? e.message : String(e);
   return `${what}に失敗しました: ${why}`;
 }
 

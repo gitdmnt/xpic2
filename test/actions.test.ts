@@ -5,7 +5,7 @@
 // 6 つとも実在することだけを固定しておく。
 
 import { describe, expect, it } from 'bun:test';
-import { ACTION_ENDPOINTS } from '../src/server/x-post.ts';
+import { ACTION_ENDPOINTS } from '../src/x/actions.ts';
 import placeholder from './fixtures-placeholder.json' with { type: 'json' };
 
 const flag = placeholder as Record<string, { queryId?: string } | undefined>;

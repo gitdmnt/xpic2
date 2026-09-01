@@ -3,9 +3,10 @@
 // 唯一の持ち主をここに集約する（Node 版の state オブジェクトに相当）。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ConfigStatus, Media, Options, Source } from '../shared/types.ts';
+import type { Media, Options, Source } from '../shared/types.ts';
 import { DEFAULT_OPTIONS } from '../shared/types.ts';
-import { fetchConfigStatus } from './lib/api.ts';
+import type { ExtStatus } from './lib/x.ts';
+import { extStatus, isReady } from './lib/x.ts';
 import { usePersistedState } from './hooks/usePersistedState.ts';
 import { useTimeline } from './hooks/useTimeline.ts';
 import { useTweetActions } from './hooks/useTweetActions.ts';
@@ -94,7 +95,7 @@ export function App() {
     [setOpts],
   );
 
-  /** 認証情報の設定状況。取得前は null で、この間は読み込みを始めない。 */
+  /** 権限とログインの状況。取得前は null で、この間は読み込みを始めない。 */
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -161,18 +162,19 @@ export function App() {
     loadRef.current();
   }, []);
 
-  // ── 起動時の設定確認 ─────────────────────────────────────────
+  // ── 起動時の状況確認 ─────────────────────────────────────────
   useEffect(() => {
     let alive = true;
-    fetchConfigStatus()
+    extStatus()
       .then((status) => {
         if (!alive) return;
-        setConfigured(status.configured);
-        // 未設定なら何も読まずに設定モーダルを開く。
-        if (!status.configured) setSettingsOpen(true);
+        const ready = isReady(status);
+        setConfigured(ready);
+        // 権限が無い・ログインしていないなら、何も読まずに設定モーダルを開く。
+        if (!ready) setSettingsOpen(true);
       })
-      .catch(() => {
-        if (alive) setConfigError('サーバに接続できません。');
+      .catch((e: unknown) => {
+        if (alive) setConfigError(e instanceof Error ? e.message : '状況を取得できませんでした。');
       });
     return () => {
       alive = false;
@@ -259,15 +261,15 @@ export function App() {
     [entries.length],
   );
 
-  const handleSaved = useCallback((status: ConfigStatus) => {
+  const handleStatusChanged = useCallback((status: ExtStatus) => {
     setConfigError(null);
-    setConfigured(status.configured);
+    setConfigured(isReady(status));
   }, []);
 
   // ── 状態表示 ─────────────────────────────────────────────────
   const status = (() => {
     if (configError) return <div className="err">{configError}</div>;
-    if (configured === false) return <>まず接続設定を行ってください。</>;
+    if (configured === false) return <>まず接続設定を済ませてください。</>;
     if (error) {
       return (
         <>
@@ -332,7 +334,7 @@ export function App() {
         </div>
       ) : null}
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={handleSaved} />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onChanged={handleStatusChanged} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { MouseEvent } from 'react';
 import type { Media, Tweet, TweetAction } from '../../shared/types';
+import { ext } from '../../ext/browser.ts';
 import type { TweetActionState } from '../hooks/useTweetActions';
 import { compact, mediaUrl, relTime } from '../lib/format';
 import { ActionBar } from './ActionBar';
@@ -29,6 +30,23 @@ export interface LightboxProps {
 
 /** 残りがこの件数を切ったら追加読み込みを促す（移植元と同じ閾値）。 */
 const NEAR_END = 6;
+
+/**
+ * ブラウザのダウンロードに渡す。
+ * pbs.twimg.com の URL は末尾が拡張子を持たないので、format クエリから補ってやる。
+ */
+function save(url: string): Promise<unknown> {
+  let filename: string | undefined;
+  try {
+    const u = new URL(url);
+    const base = u.pathname.split('/').pop();
+    const format = u.searchParams.get('format');
+    if (base) filename = format && !base.includes('.') ? `${base}.${format}` : base;
+  } catch {
+    // 名前を作れなければブラウザに任せる
+  }
+  return ext().downloads.download(filename ? { url, filename } : { url });
+}
 
 /** 拡大表示中のショートカット。x.com の割り当てに合わせてある。 */
 const ACTION_KEYS: Record<string, TweetAction> = { l: 'like', t: 'retweet', b: 'bookmark' };
@@ -100,8 +118,8 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
   const { tweet, media } = entry;
   const large = mediaUrl(media.url, 'large');
   const orig = mediaUrl(media.url, 'orig');
-  // 写真は原寸、動画・GIF は mp4 を保存対象にする。
-  const saveUrl = `/api/media?dl=1&url=${encodeURIComponent(media.type === 'photo' ? orig : (media.video ?? orig))}`;
+  // 写真は原寸、動画と GIF は mp4 を保存対象にする。
+  const saveUrl = media.type === 'photo' ? orig : (media.video ?? orig);
   const isMovie = (media.type === 'video' || media.type === 'animated_gif') && Boolean(media.video);
   // 送るたびに要素を作り直す。src を保持したままだと前の画像のフォールバック状態が残る。
   const stageKey = `${index}:${media.key}`;
@@ -178,7 +196,10 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
             <a href={orig} target="_blank" rel="noreferrer noopener">
               原寸
             </a>
-            <a href={saveUrl}>保存</a>
+            {/* サーバ版は中継してファイル名を付けていた。拡張機能では downloads API がそれをやる。 */}
+            <button type="button" className="aslink" onClick={() => void save(saveUrl)}>
+              保存
+            </button>
             <span style={{ color: 'var(--fg-faint)' }}>
               {index + 1} / {list.length}
             </span>

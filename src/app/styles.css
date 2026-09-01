@@ -294,6 +294,10 @@ details summary { cursor: pointer; color: var(--fg-dim); font-size: 13px; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px; color: var(--fg-dim); white-space: pre-wrap;
 }
+/* 権限とログインは満たしているかどうかが一目で要るので、行ごとに色を振る。 */
+.statusbox .ok { color: #4fd18b; }
+.statusbox .ng { color: var(--danger); }
+.statusbox .sub { padding-left: 1.2em; color: var(--fg-faint); }
 .fine { color: var(--fg-faint); font-size: 12px; margin: 14px 0 0; }
 code { background: #0d1016; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
 
@@ -349,6 +353,12 @@ code { background: #0d1016; border: 1px solid var(--line); border-radius: 4px; p
 .lb-info .idx { color: var(--fg-faint); font-variant-numeric: tabular-nums; }
 .lb-info a { color: var(--accent); text-decoration: none; }
 .lb-info a:hover { text-decoration: underline; }
+/* 保存はダウンロード API を呼ぶので button だが、隣の «X で開く» と並ぶので見た目はリンクに揃える。 */
+.aslink {
+  padding: 0; border: 0; background: transparent;
+  color: var(--accent); font: inherit;
+}
+.aslink:hover { background: transparent; border-color: transparent; text-decoration: underline; }
 .lb-close { position: absolute; top: 14px; right: 16px; z-index: 2; }
 .lb-nav {
   position: absolute; top: 50%; transform: translateY(-50%);

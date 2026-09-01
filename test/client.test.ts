@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import type { TwitterOpenApiClient } from 'twitter-openapi-typescript';
-import { applyOverrides, parseCookie } from '../src/server/x-client.ts';
+import { applyOverrides } from '../src/x/client.ts';
 import placeholder from './fixtures-placeholder.json' with { type: 'json' };
 
 type Flag = Record<string, Record<string, unknown>>;
@@ -82,18 +82,5 @@ describe('applyOverrides', () => {
     expect(applied.features).toEqual([known]);
     expect(Object.keys(f).length).toBe(originalCount);
     expect('not_a_real_feature' in f).toBe(false);
-  });
-});
-
-describe('parseCookie', () => {
-  it('cookie ヘッダ全文から必要な値を取り出す', () => {
-    const jar = parseCookie('guest_id=v1%3A17; auth_token=AAA; ct0=BBB; lang=ja');
-    expect(jar.auth_token).toBe('AAA');
-    expect(jar.ct0).toBe('BBB');
-  });
-
-  it('壊れた入力でも落ちない', () => {
-    expect(parseCookie('')).toEqual({});
-    expect(parseCookie('nonsense;;;=x')).toEqual({});
   });
 });

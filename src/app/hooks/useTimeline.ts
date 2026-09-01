@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Options, Source, Tweet } from '../../shared/types.ts';
-import { ApiClientError, fetchTimeline } from '../lib/api.ts';
+import { ApiError, fetchTimeline } from '../lib/x.ts';
 
 interface TimelineError {
   message: string;
@@ -111,7 +111,7 @@ export function useTimeline({ source, query, opts, enabled }: UseTimelineParams)
       // 中断は読み直しの副作用なので、エラーとして見せない。
       if (controller.signal.aborted) return;
       if (!alive()) return;
-      if (e instanceof ApiClientError) {
+      if (e instanceof ApiError) {
         setError({ message: e.message, hint: e.hint, status: e.status });
       } else {
         setError({ message: e instanceof Error ? e.message : String(e), hint: null, status: 0 });

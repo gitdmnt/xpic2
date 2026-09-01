@@ -4,15 +4,17 @@
   "private": true,
   "description": "X (Twitter) の内部 GraphQL API から画像付きポストだけを集めて masonry 表示するローカル Web アプリ",
   "type": "module",
-  "module": "server.ts",
+  "module": "src/app/main.tsx",
   "scripts": {
-    "start": "bun server.ts",
-    "dev": "bun --hot server.ts",
+    "build": "bun build.ts",
+    "build:firefox": "bun build.ts --firefox",
+    "watch": "bun build.ts --watch",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "knip": "knip-bun"
   },
   "dependencies": {
+    "@flaticon/flaticon-uicons": "^3.3.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "twitter-openapi-typescript": "^0.0.56"
