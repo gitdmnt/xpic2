@@ -305,6 +305,27 @@ describe('mapTweet — 自分が掛けた操作', () => {
   });
 });
 
+describe('mapTweet — 広告', () => {
+  /** 広告はタイムラインのエントリに promotedMetadata が載る。ライブラリがそれをここへ持ち上げてくる。 */
+  const ad = (id: string): Json => ({
+    ...post(id, 'sponsor', [photo(`ad-${id}`, 800, 800)]),
+    promotedMetadata: { advertiserResults: {}, disclosureType: 'NoDisclosure' },
+  });
+
+  it('promotedMetadata の付いたポストは写さない', () => {
+    expect(mapTweet(asData(ad('ad1')))).toBeNull();
+  });
+
+  it('広告がリポスト形式でも写さない', () => {
+    const rt: Json = { ...ad('ad2'), retweeted: post('orig', 'origauthor', [photo('real', 900, 1200)]) };
+    expect(mapTweet(asData(rt))).toBeNull();
+  });
+
+  it('広告以外は promotedMetadata を持たないので通る', () => {
+    expect(mapTweet(asData(post('1', 'alice', [photo('p1', 10, 10)])))?.id).toBe('1');
+  });
+});
+
 describe('mapTimeline', () => {
   const res = asTimeline({
     data: [
@@ -313,6 +334,7 @@ describe('mapTimeline', () => {
       { ...post('rt', 'carol', [photo('x', 1, 1)]), retweeted: post('3r', 'orig', [photo('p3', 900, 1200)]) },
       post('5', 'dave', []),
       post('1', 'alice', [photo('p1', 1200, 1600)]),
+      { ...post('ad', 'sponsor', [photo('adimg', 800, 800)]), promotedMetadata: { advertiserResults: {} } },
     ],
     cursor: { top: { value: 'TOPCUR' }, bottom: { value: 'BOTCUR' } },
   });
@@ -321,7 +343,7 @@ describe('mapTimeline', () => {
     expect(mapTimeline(res).cursor).toBe('BOTCUR');
   });
 
-  it('メディア付きだけを、重複なく、RT は元ポストとして返す', () => {
+  it('メディア付きだけを、重複なく、広告を除き、RT は元ポストとして返す', () => {
     expect(mapTimeline(res).items.map((t) => t.id)).toEqual(['1', '2', '3r']);
   });
 

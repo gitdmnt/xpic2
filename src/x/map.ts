@@ -218,12 +218,16 @@ function mapCore(data: TweetApiUtilsData): Tweet | null {
 /**
  * 1 件のポストを写す。メディアが無ければ null。
  *
+ * 広告は写さない。タイムラインのエントリに `promotedMetadata` が載るのは広告だけで、
+ * ライブラリがそれをここまで持ち上げてくれる。本文や作者から推し量る必要はない。
+ *
  * リポストは元ポストを実体にする。外側は作者も本文も "RT @..." のラッパでしかないので、
  * `retweeted` の中身を採用し、リポストした人だけを `retweetedBy` に残す。
  * 引用（`quoted`）は辿らない。引用元の画像が本人の投稿として混ざるのを避ける。
  */
 export function mapTweet(data: TweetApiUtilsData): Tweet | null {
   if (typeof data !== 'object' || data === null) return null;
+  if (data.promotedMetadata) return null;
 
   const retweeted = data.retweeted;
   if (retweeted) {
