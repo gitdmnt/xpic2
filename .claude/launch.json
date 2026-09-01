@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "xpic2",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["server.ts"],
+      "port": 5173,
+      "autoPort": true
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "xpic2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "X (Twitter) の内部 GraphQL API から画像付きポストだけを集めて masonry 表示するローカル Web アプリ",
+  "type": "module",
+  "module": "server.ts",
+  "scripts": {
+    "start": "bun server.ts",
+    "dev": "bun --hot server.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "twitter-openapi-typescript": "^0.0.56"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "typescript": "^7.0.2"
+  }
+}

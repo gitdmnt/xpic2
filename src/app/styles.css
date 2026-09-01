@@ -1,0 +1,366 @@
+/* xpic2 の全スタイル。public/style.css からの移植で、クラス名は一切変えていない。 */
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0d11;
+  --bg-elev: #14181f;
+  --bg-elev2: #1b2029;
+  --line: #262d38;
+  --fg: #e8ecf3;
+  --fg-dim: #97a2b3;
+  --fg-faint: #6b7686;
+  --accent: #6ee7ff;
+  --accent2: #a78bfa;
+  --danger: #ff7a7a;
+  --gap: 12px;
+}
+
+* { box-sizing: border-box; }
+
+/* バニラ版にあった [hidden] { display: none !important } は落とした。
+   React 版はモーダルもライトボックスも条件レンダリングで消すので、
+   display を持つ要素を hidden 属性で覆い隠す必要がない。 */
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif;
+}
+
+body { padding-bottom: 80px; }
+
+button, input, textarea, select { font: inherit; color: inherit; }
+
+button {
+  background: var(--bg-elev2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+button:hover { background: #232a35; border-color: #38414f; }
+button.primary {
+  background: linear-gradient(180deg, var(--accent), #35c8e8);
+  border-color: transparent;
+  color: #04222b;
+  font-weight: 700;
+}
+button.primary:hover { filter: brightness(1.08); }
+button.ghost { background: transparent; }
+
+/* ── ヘッダ ───────────────────────────────── */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: rgba(11, 13, 17, .82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.logo {
+  width: 16px; height: 16px; border-radius: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+
+.tabs { display: flex; gap: 4px; background: var(--bg-elev); padding: 3px; border-radius: 10px; border: 1px solid var(--line); }
+.tabs button { background: transparent; border: 0; color: var(--fg-dim); padding: 5px 11px; border-radius: 7px; }
+.tabs button:hover { color: var(--fg); background: var(--bg-elev2); }
+.tabs button.on { background: var(--bg-elev2); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+
+.query { display: flex; gap: 6px; flex: 1 1 240px; min-width: 200px; }
+.query input {
+  flex: 1;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 11px;
+  outline: none;
+}
+.query input:focus { border-color: var(--accent); }
+.query input:disabled { opacity: .4; }
+
+/* ── ツールバー ───────────────────────────── */
+/* top はヘッダの実測高さ（53px）に合わせてある。ヘッダの padding を変えたらここも変える。 */
+.toolbar {
+  position: sticky;
+  top: 53px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: rgba(11, 13, 17, .82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+.ctl { display: flex; align-items: center; gap: 8px; }
+.ctl input[type=range] { width: 130px; accent-color: var(--accent); }
+.ctl output { min-width: 3ch; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.chk { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+.chk input { accent-color: var(--accent); }
+.sep { width: 1px; height: 18px; background: var(--line); }
+.grow { flex: 1; }
+.counter { color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+
+/* ── masonry ─────────────────────────────── */
+main { padding: 16px; }
+.grid { position: relative; width: 100%; }
+
+.tile {
+  position: absolute;
+  top: 0; left: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  cursor: zoom-in;
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1), height .28s cubic-bezier(.2,.8,.2,1);
+  will-change: transform;
+  /* バニラ版は .fresh を一時的に付けて「その場に出す」処理をしていたが、React では
+     要素の生成時点で最終位置の transform がインラインで入るため原点からの飛び込みが起きない。
+     よって .fresh は廃止し、入場アニメーションを .tile へ直接当てる。
+     列幅変更などで既存タイルが動くときは上の transition だけが効く。 */
+  animation: pop .32s ease both;
+}
+
+/* 入場は opacity だけで見せる。filter: blur() を混ぜると合成レイヤのラスタライズが
+   粗いまま確定してしまい、アニメーション終了後も画面全体がぼやけて見える。 */
+@keyframes pop { from { opacity: 0; } to { opacity: 1; } }
+
+/* .thumb は残りの高さを埋める。タイル高さは masonry 側で
+   round(colW / aspect) + footer として算出済みなので、実際には伸縮せずぴたりと収まる。 */
+.tile .thumb { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #0f1319; }
+.tile img.pic, .tile video.pic {
+  display: block;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  background: #0f1319;
+}
+.tile.blur img.pic, .tile.blur video.pic { filter: blur(24px) saturate(.6); transform: scale(1.1); }
+.tile.blur .sensitive-tag { display: block; }
+.sensitive-tag {
+  display: none;
+  position: absolute; inset: auto 0 50% 0;
+  text-align: center; font-size: 12px; color: #fff; text-shadow: 0 1px 4px #000;
+  pointer-events: none;
+}
+.tile:hover { border-color: #3b4658; }
+.tile:hover img.pic { filter: brightness(1.04); }
+
+.badge {
+  position: absolute;
+  top: 6px; right: 6px;
+  display: flex; gap: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+}
+.badge span {
+  background: rgba(0,0,0,.62);
+  backdrop-filter: blur(4px);
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: #fff;
+}
+
+/* 高さ 34px は masonry の footer 値と対になっている。片方だけ変えると行がずれる。 */
+.meta {
+  display: flex; align-items: center; gap: 6px;
+  flex: none;
+  padding: 6px 8px;
+  height: 34px;
+  font-size: 12px;
+  color: var(--fg-dim);
+  border-top: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+.meta img { width: 18px; height: 18px; border-radius: 50%; flex: none; }
+.meta .name { color: var(--fg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta .likes { margin-left: auto; flex: none; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+
+/* ── 操作ボタン（いいね・リポスト・ブックマーク） ─── */
+.actions { display: flex; align-items: center; gap: 2px; }
+.actions .act {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 7px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--fg-dim);
+  line-height: 1;
+}
+.actions .act:hover { background: rgba(255,255,255,.14); border-color: transparent; color: var(--fg); }
+/* 送信中は押せない。取り消し待ちと実行待ちの見分けは付かないので、色は変えず薄くするだけ。 */
+.actions .act:disabled { opacity: .45; cursor: progress; }
+.act svg { display: block; width: 17px; height: 17px; }
+.act .n { font-size: 12px; font-variant-numeric: tabular-nums; }
+.act.on.like { color: #ff6b8b; }
+.act.on.retweet { color: #4fd18b; }
+.act.on.bookmark { color: var(--accent); }
+
+/* タイルの上に重ねる版。ホバーで出すが、何か掛かっているタイルでは出したままにする。 */
+.tile-actions {
+  position: absolute;
+  left: 5px; bottom: 5px;
+  padding: 1px;
+  border-radius: 9px;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity .12s;
+}
+.tile:hover .tile-actions,
+.tile-actions:focus-within,
+.tile-actions.active { opacity: 1; }
+/* ホバーの無い端末では出しっぱなしにする（触れないと見えないボタンになってしまうため）。 */
+@media (hover: none) { .tile-actions { opacity: 1; } }
+
+/* ライトボックス版。左端を本文の行頭に揃えるため、ボタンの内側余白の分だけ戻す。 */
+.lb-actions { margin-left: -7px; }
+
+/* ── 状態表示 ─────────────────────────────── */
+.status { padding: 28px 16px 48px; text-align: center; color: var(--fg-dim); }
+.status .err { color: var(--danger); }
+.status .hint { color: var(--fg-faint); font-size: 13px; margin-top: 6px; }
+.spinner {
+  width: 22px; height: 22px; margin: 0 auto 10px;
+  border: 2px solid var(--line); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+/* 無限スクロールのセンチネル。id / class のどちらで書かれても効くようにしてある。 */
+#sentinel, .sentinel { height: 1px; }
+
+/* ── 設定モーダル ─────────────────────────── */
+.modal {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(4, 6, 9, .7);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 6vh 16px;
+  overflow: auto;
+}
+.sheet {
+  width: min(760px, 100%);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.6);
+}
+.sheet header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet h2 { margin: 0; font-size: 17px; }
+.lede { color: var(--fg-dim); font-size: 13px; margin: 0 0 14px; }
+.field { display: block; margin: 12px 0; }
+.field > span { display: block; font-size: 12px; color: var(--fg-dim); margin-bottom: 5px; }
+textarea {
+  width: 100%;
+  background: #0d1016;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  outline: none;
+}
+textarea:focus { border-color: var(--accent); }
+details summary { cursor: pointer; color: var(--fg-dim); font-size: 13px; }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.msg { font-size: 13px; color: var(--accent); }
+.msg.bad { color: var(--danger); }
+.statusbox {
+  margin-top: 14px; padding: 10px 12px;
+  background: #0d1016; border: 1px solid var(--line); border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--fg-dim); white-space: pre-wrap;
+}
+.fine { color: var(--fg-faint); font-size: 12px; margin: 14px 0 0; }
+code { background: #0d1016; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+/* ── 操作の失敗通知 ───────────────────────── */
+/* ライトボックス(z-index: 70)より前に出す。拡大表示中に押しても読めるようにするため。 */
+.toast {
+  position: fixed;
+  left: 50%; bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 80;
+  display: flex; align-items: center; gap: 10px;
+  max-width: min(680px, calc(100% - 32px));
+  padding: 9px 10px 9px 14px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0,0,0,.55);
+  color: var(--danger);
+  font-size: 13px;
+}
+.toast button { flex: none; padding: 2px 8px; color: var(--fg-dim); }
+
+/* ── ライトボックス ───────────────────────── */
+.lightbox {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(3, 5, 8, .95);
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+.lb-stage {
+  margin: 0; display: flex; align-items: center; justify-content: center;
+  padding: 24px 64px 8px; min-height: 0;
+}
+.lb-stage img, .lb-stage video {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.7);
+}
+.lb-info {
+  padding: 12px 24px 22px;
+  display: flex; align-items: flex-start; gap: 12px;
+  max-width: 1000px; margin: 0 auto; width: 100%;
+  color: var(--fg-dim); font-size: 13px;
+}
+/* 本文側のブロック。長い本文で flex アイテムが縮まないと省略が効かないので min-width: 0 が要る。 */
+.lb-info > div { min-width: 0; flex: 1; }
+.lb-info img.av { width: 36px; height: 36px; border-radius: 50%; flex: none; }
+.lb-info .who { color: var(--fg); font-weight: 700; }
+.lb-info .handle { color: var(--fg-faint); font-weight: 400; }
+.lb-info .txt { margin: 3px 0 6px; white-space: pre-wrap; word-break: break-word; color: var(--fg); }
+.lb-info .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.lb-info .idx { color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.lb-info a { color: var(--accent); text-decoration: none; }
+.lb-info a:hover { text-decoration: underline; }
+.lb-close { position: absolute; top: 14px; right: 16px; z-index: 2; }
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 68px; font-size: 30px; line-height: 1;
+  background: rgba(20,24,31,.6); z-index: 2;
+}
+.lb-nav.prev { left: 10px; }
+.lb-nav.next { right: 10px; }
+
+@media (max-width: 640px) {
+  /* 狭い画面ではヘッダが 2 段に折り返すので、ツールバーの吸着位置を下げる。 */
+  .toolbar { top: 97px; }
+  .lb-stage { padding: 16px 8px 4px; }
+  .lb-nav { width: 36px; height: 56px; }
+}
