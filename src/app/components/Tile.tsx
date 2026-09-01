@@ -3,7 +3,7 @@ import type { Media, Tweet, TweetAction } from '../../shared/types';
 import type { Placement } from '../hooks/useMasonry';
 import type { TweetActionState } from '../hooks/useTweetActions';
 import { mediaUrl } from '../lib/format';
-import { ActionBar } from './ActionBar';
+import { MetaActionBar, OverlayActionBar } from './ActionBar';
 import { Icon, type IconName } from './Icon';
 
 /**
@@ -19,7 +19,6 @@ interface TileProps {
   placement: Placement;
   showMeta: boolean;
   blurred: boolean;
-  /** 拾ったので外れていく途中。薄くなりきるまでは場所を占めたまま残る。 */
   leaving: boolean;
   onOpen(): void;
   /** いいね・リポスト・ブックマークの状態。ポスト単位なので同じ投稿のタイルは同じ値を受け取る。 */
@@ -27,20 +26,13 @@ interface TileProps {
   onAction(tweet: Tweet, action: TweetAction): void;
 }
 
-/**
- * 右上バッジ 1 つ分。
- * ▶ と GIF をアイコンにしたので、文字列の配列では表せなくなった。
- * 枚数（+2）だけは数なのでアイコンに置き換えられず、文字のまま残す。
- */
+/** 右上バッジ 1 つ分。枚数（+2）だけは数なのでアイコンに置き換えられず、文字で持つ。 */
 interface Badge {
   /** React の key。種別ごとに 1 つしか出ないので種別名で足りる。 */
   key: string;
   icon?: IconName;
   text?: string;
-  /**
-   * 読み上げでの名前。Icon は aria-hidden なので、GIF のように文字を伴わないバッジは
-   * これが無いと中身の空の要素になり、種別がまるごと伝わらない。
-   */
+  /** 読み上げでの名前。GIF のように文字を伴わないバッジは、これが無いと種別ごと伝わらない。 */
   label: string;
 }
 
@@ -64,12 +56,9 @@ function badges(media: Media, groupCount: number): Badge[] {
 // 触れたときに動くのは囲みだけ。写真の明るさは変えない（見えているものが変わってしまう）。
 //
 // group は写真に重ねる操作ボタンの出し入れ、@container はメタ行の数字の出し入れが見る先。
-// 幅も高さも masonry が実寸で与えているので、寸法の閉じ込めで循環は起きない。
 //
-// 入場アニメーション（animate-pop）を要素へ直に当てられるのは、React では生成の時点で
-// 最終位置の transform がインラインで入り、原点からの飛び込みが起きないため。
-// 列数変更などで既存タイルが動くときは transition だけが効く。
-// 動きを減らす設定では、移動も入場も止める。
+// animate-pop を要素へ直に当てられるのは、生成の時点で最終位置の transform がインラインで入り、
+// 原点からの飛び込みが起きないため。既存タイルが動くときは transition だけが効く。
 const TILE =
   'group @container absolute top-0 left-0 flex cursor-zoom-in flex-col overflow-hidden rounded-md border border-line bg-elev' +
   ' transition-[transform,width,height,opacity] duration-280 ease-tile will-change-transform animate-pop hover:border-line-strong' +
@@ -89,7 +78,7 @@ export const Tile = memo(function Tile({
 }: TileProps) {
   const rootRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  // 再生中は img を隠して video を見せる。Node 版と同じく表示の入れ替えで実現する。
+  // 再生中は img を隠して video を見せる。差し替えではなく表示の入れ替えで行う。
   const [playing, setPlaying] = useState(false);
   // CDN のサイズ付き URL が 404 になる個体が実在するので、素の URL へ一度だけ落とす。
   const [fallback, setFallback] = useState(false);
@@ -147,8 +136,7 @@ export const Tile = memo(function Tile({
       onMouseEnter={hasVideo && media.type === 'video' ? () => setPlaying(true) : undefined}
       onMouseLeave={hasVideo && media.type === 'video' ? () => setPlaying(false) : undefined}
     >
-      {/* 残りの高さを埋める。タイル高さは masonry 側で round(colW / aspect) + footer として
-          算出済みなので、実際には伸縮せずぴたりと収まる。 */}
+      {/* 高さは masonry が round(colW / aspect) + footer で出した値なので、伸縮せず収まる。 */}
       <div
         className="relative min-h-0 w-full flex-auto overflow-hidden bg-sunk"
         style={{ height: `${placement.height - footer}px` }}
@@ -181,7 +169,6 @@ export const Tile = memo(function Tile({
           <div className="absolute top-2 right-2 flex gap-1 text-2xs tracking-[.02em]">
             {badgeList.map((b) => (
               // role="img" で 1 つの図として名前を与える。中の記号ではなく label が読まれる。
-              // 写真の明暗に関わらず読めるよう、地の生成りをそのまま小さく敷く。
               <span key={b.key} role="img" aria-label={b.label} className="rounded-sm bg-veil px-1.5 py-0.5 text-fg">
                 {b.icon ? <Icon name={b.icon} /> : null}
                 {b.icon && b.text ? ' ' : null}
@@ -190,12 +177,9 @@ export const Tile = memo(function Tile({
             ))}
           </div>
         )}
-        {/* 「センシティブ」の字はアイコン 1 つに畳んだ。Icon は aria-hidden なので、
-            role="img" と aria-label が無いと中身の空の要素になり、警告そのものが消える。
-            title は、絵だけでは伝わらない利用者のためにホバーで語を出す。
-            ぼかしの下の写真は明るさが読めないので、印の側に地を敷いて成立させる
-            （影で浮かせる手は、地が明るいと効かない）。
-            15px のままではぼけた写真の上で何の絵か判らないので、ここだけ 20px にする。 */}
+        {/* role="img" と aria-label が無いと中身の空の要素になり、警告そのものが消える。
+            ぼかしの下の写真は明るさが読めないので、印の側に地を敷く（影で浮かせる手は地が
+            明るいと効かない）。15px ではぼけた写真の上で判らないので、ここだけ 20px にする。 */}
         {blurred && (
           <div
             className="pointer-events-none absolute inset-x-0 bottom-1/2 flex items-center justify-center bg-veil px-2 py-1 text-fg"
@@ -206,28 +190,24 @@ export const Tile = memo(function Tile({
             <Icon name="hidden" size="lg" />
           </div>
         )}
-        {/* 操作ボタンの居場所はメタ行だが、情報を表示を切ると行ごと消える。
-            そのときだけ従来どおり写真に重ねて、押す手段が無くなるのを防ぐ。 */}
-        {!showMeta && <ActionBar tweet={tweet} state={action} onAction={onAction} share variant="tile" />}
+        {/* 操作ボタンの居場所はメタ行だが、その表示を切ると行ごと消える。
+            そのときだけ写真に重ねて、押す手段が無くなるのを防ぐ。 */}
+        {!showMeta && <OverlayActionBar tweet={tweet} state={action} onAction={onAction} />}
       </div>
       {/* 高さ 34px は masonry の footer 値と対になっている。片方だけ変えると行がずれる。 */}
       {showMeta && (
         <div className="flex h-[34px] shrink-0 items-center gap-2 border-t border-line bg-elev px-2 text-xs text-fg-dim">
-          {/* 名前が見える字に戻ったので、アバターの alt は空にする。
-              同じ語を alt と字の両方に置くと、読み上げで投稿者名が二度続く。
+          {/* 同じ語を alt と字の両方に置くと読み上げで投稿者名が二度続くので、alt は空にする。
               長い名前は省略記号で切れるため、全体を読む手段として title は字の側に残す。 */}
           <img src={tweet.user.avatar} alt="" loading="lazy" className="size-[18px] shrink-0 rounded-full" />
-          {/* この行で伸び縮みしてよいのは名前だけなので、伸びる側と縮む側を両方ここが持つ。
-              min-w-0 が無いと flex アイテムは中身の最小幅（日本語なら 1 文字ぶん）より細くならず、
-              列数を 8 まで増やして 1 タイルが 132px まで痩せたとき、名前が縮まずに右のボタンを
-              行の外へ押し出す。flex-auto と対にして、余った幅は名前が受け取り、
-              足りない幅も名前が先に手放して省略記号になるようにする。
-              字色を fg まで上げるのは、これがメタ行で唯一の「読ませる」中身になったため。 */}
+          {/* この行で伸び縮みしてよいのは名前だけ。min-w-0 が無いと flex アイテムは中身の
+              最小幅より細くならず、1 タイルが 132px まで痩せたときに右のボタンを行の外へ
+              押し出す。flex-auto と対にして、余った幅も足りない幅も名前が引き受ける。 */}
           <span className="min-w-0 flex-auto truncate font-medium text-fg" title={tweet.user.name}>
             {tweet.user.name}
           </span>
-          {/* いいね数はボタン自身が持つ（counts="like"）。別に ♥ を並べるとハートが二つになる。 */}
-          <ActionBar tweet={tweet} state={action} onAction={onAction} counts="like" share variant="meta" />
+          {/* いいね数はボタンが自分で出す。別に ♥ を並べるとハートが二つになる。 */}
+          <MetaActionBar tweet={tweet} state={action} onAction={onAction} />
         </div>
       )}
     </article>

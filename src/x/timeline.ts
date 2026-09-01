@@ -1,24 +1,16 @@
-// 取得は twitter-openapi-typescript に任せ、このファイルは
-// 「どのエンドポイントを叩くか」「何ページ進むか」だけを持つ。
-//
-// queryId と features の既定値はライブラリが実行時に取得する placeholder.json が供給し、
-// background.ts が観測した分だけを client.ts の applyOverrides が上書きする。
-// したがってここには URL も features もヘッダも出てこない。
+// 取得はライブラリに任せ、このファイルが持つのは、どのエンドポイントを叩くかと何ページ進むかだけ。
+// queryId と features の面倒は client.ts が見るので、ここには URL もヘッダも出てこない。
 
 import type { TimelineApiUtilsResponse, TweetApiUtilsData } from 'twitter-openapi-typescript';
 
 import type { Filters, Source, TimelineResponse, Tweet } from '../shared/types.ts';
 import { filterItems, mapTimeline } from './map.ts';
 import { getClient } from './client.ts';
-// 例外の日本語化は操作(actions.ts)と共有するので error.ts に置いてある。
 import { ApiError, queryIdOf, toApiError } from './error.ts';
 
 /**
- * ソースと GraphQL オペレーション名の対応。
- *
- * この名前は 404 の案内で名指しするために要る。オペレーション名はリクエスト URL の末尾に
- * そのまま現れるので、ユーザーは DevTools の絞り込みにこの文字列をそのまま打ち込める。
- * 名前を出さずに「queryId が古い」とだけ言っても、どのリクエストを Copy as cURL すればよいか分からない。
+ * 404 の案内で名指しするために要る。オペレーション名はリクエスト URL の末尾にそのまま現れるので、
+ * 利用者は DevTools の絞り込みにこの文字列をそのまま打ち込める。
  */
 const ENDPOINT: Record<Source, string> = {
   user: 'UserMedia',
@@ -32,10 +24,6 @@ const USER_LOOKUP = 'UserByScreenName';
 
 /** 1 リクエストあたりの要求件数。X 側の上限に近い値で、これ以上増やしても返ってこない。 */
 const PAGE = 40;
-
-// ---------------------------------------------------------------------------
-// ユーザー ID の解決
-// ---------------------------------------------------------------------------
 
 // screenName → restId。同じ画面で何度もページを送るので、1 プロセス内では引き直さない。
 const userIdCache = new Map<string, string>();
@@ -63,10 +51,6 @@ async function resolveUserId(screenName: string): Promise<string> {
   userIdCache.set(key, id);
   return id;
 }
-
-// ---------------------------------------------------------------------------
-// 1 ページの取得
-// ---------------------------------------------------------------------------
 
 async function fetchPage(
   source: Source,
@@ -101,8 +85,7 @@ async function fetchPage(
         const res = await api.getBookmarks({ cursor: c, count: PAGE });
         return res.data;
       }
-      // おすすめとフォロー中は別のオペレーションで、ライブラリでも別メソッドになっている。
-      // 引数は同じで、X 側での並べ替え(アルゴリズム順 / 時系列順)だけが違う。
+      // おすすめとフォロー中は引数が同じで、X 側の並べ替え(アルゴリズム順 / 時系列順)だけが違う。
       case 'foryou': {
         const res = await api.getHomeTimeline({ cursor: c, count: PAGE });
         return res.data;
@@ -116,10 +99,6 @@ async function fetchPage(
     throw toApiError(e, endpoint, queryIdOf(client, endpoint));
   }
 }
-
-// ---------------------------------------------------------------------------
-// タイムラインの収集
-// ---------------------------------------------------------------------------
 
 export interface FetchMediaTimelineParams {
   source: Source;
@@ -161,9 +140,8 @@ export async function fetchMediaTimeline({
       items.push(it);
     }
 
-    // 空ページ・カーソル据え置きはタイムラインの終端とみなす。
-    // 旧実装はメディア付きの件数で空を判定していたが、ライブラリはページ全体の件数を持つので
-    // 「メディアが 1 件も無いページ」で打ち切らずに済む。
+    // 空ページ・カーソル据え置きはタイムラインの終端とみなす。メディアの件数ではなくページ全体の
+    // 件数で見るので、メディアが 1 件も無いページで打ち切らずに済む。
     if (!bottom || bottom === next || page.data.length === 0) {
       return { items, cursor: null, requests, raw };
     }

@@ -1,23 +1,14 @@
-// queryId と features の「上書き指定」を持つ。
-//
-// 既定値は twitter-openapi-typescript が実行時に取得する placeholder.json が唯一の出どころで、
-// このファイルには既定値の表は無い。持つのは、その既定値が X のローテーションに遅れたときに
+// 既定値の表は持たない。持つのは、placeholder.json の既定値が X のローテーションに遅れたときに
 // 塞ぐための上書きだけで、空なら既定値がそのまま効く。重ねるのは client.ts の applyOverrides。
 //
-// 上書きの主な供給元は background.ts である。利用者の x.com のタブが実際に投げている
-// リクエストを観測して、queryId と features をそのまま拾う。サーバ版で必要だった
-// 「Copy as cURL して貼る」手順は、その手当が届かないときの控えとして parseCurl に残してある。
-//
-// 認証情報はここでは扱わない。cookie はブラウザが持ち、こちらは保存も参照もしない。
+// 供給元は background.ts の観測。parseCurl は、その観測が届かないときの控え。
 
 import { ext } from '../ext/browser.ts';
 
 const KEY = 'flags';
 
 export interface Flags {
-  /** 上書きしたいエンドポイントだけを持つ。 */
   queryIds: Record<string, string>;
-  /** 上書きしたい features だけを持つ。 */
   features: Record<string, boolean>;
 }
 
@@ -52,7 +43,6 @@ export async function loadFlags(): Promise<Flags> {
 }
 
 /**
- * 上書きを重ねる。
  * 変化が無ければ書き込まない。background.ts は x.com のリクエストごとに呼ぶので、
  * 毎回書くと storage への書き込みが際限なく増える。
  *
@@ -94,8 +84,6 @@ function unescapeShell(s: string): string {
 
 /**
  * DevTools の「Copy as cURL」文字列から queryId と features を抽出する。
- *
- * background.ts の観測が届かないとき（対象の操作を x.com 側で一度も行っていないなど）の控え。
  * cookie と bearer は読み取らない。認証はブラウザのセッションに任せているので、
  * 貼り付けた文字列から認証情報を取り込む理由がない。
  */

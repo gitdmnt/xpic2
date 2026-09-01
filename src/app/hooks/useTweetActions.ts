@@ -1,14 +1,12 @@
-// いいね・リポスト・ブックマークの状態管理。
-//
-// タイムラインの Tweet は「取得した時点の状態」しか持たないので、押した結果はこの外側で覚える。
-// 送信の返事を待ってから見た目を変えると反応が鈍いので、先に変えて（楽観更新）、
-// 失敗したときだけ押す前へ戻す。数値も同じだけ増減させて、見た目と数の食い違いを防ぐ。
+// Tweet は取得した時点の状態しか持たないので、押した結果はこの外側で覚える。
+// 返事を待ってから見た目を変えると反応が鈍いので、先に変えて、失敗したときだけ押す前へ戻す。
+// 数値も同じだけ増減させて、見た目と数の食い違いを防ぐ。
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { Tweet, TweetAction, TweetStats, TweetViewerState } from '../../shared/types.ts';
 import { sendAction } from '../lib/x.ts';
 
-/** 操作 → 自分の状態を表す項目。ボタン側もこの対応を使う。 */
+/** 操作 → 自分の状態の項目。ボタン側もこの対応を使う。 */
 export const VIEWER_FIELD: Record<TweetAction, keyof TweetViewerState> = {
   like: 'liked',
   retweet: 'retweeted',
@@ -31,7 +29,7 @@ const LABEL: Record<TweetAction, string> = {
   bookmark: 'ブックマーク',
 };
 
-/** 1 ポスト分の表示用の状態。タイルにもライトボックスにもこれを渡す。 */
+/** 1 ポスト分の表示用の状態。 */
 export interface TweetActionState {
   viewer: TweetViewerState;
   /** 楽観更新を反映した統計。取得時の値との差だけを足し引きする。 */
@@ -75,7 +73,7 @@ function failureMessage(e: unknown, action: TweetAction, on: boolean): string {
   return `${what}に失敗しました: ${why}`;
 }
 
-/** 状態が同じかを見る。Tile は memo なので、同じあいだは同じオブジェクトを渡し続けたい。 */
+/** 直前の入力と出力。Tile が memo なので、変わらないあいだは同じオブジェクトを渡し続ける。 */
 interface Cached {
   tweet: Tweet;
   override: Override | undefined;
@@ -103,7 +101,6 @@ export function useTweetActions(tweets: Tweet[]): TweetActionsState {
       if (out.has(tweet.id)) continue;
       const override = overrides[tweet.id];
       const prev = cacheRef.current.get(tweet.id);
-      // 入力（Tweet と押した結果）が同一なら出力も同一。同じオブジェクトを使い回して再描画を避ける。
       if (prev && prev.tweet === tweet && prev.override === override) {
         next.set(tweet.id, prev);
         out.set(tweet.id, prev.state);

@@ -1,7 +1,3 @@
-// localStorage に載せた状態を扱うフック。
-// 表示設定（Options）のように「後から項目が増える」値を保存するため、
-// 読み出しは初期値との浅いマージにする。
-
 import { useCallback, useEffect, useState } from 'react';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -9,17 +5,15 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * 保存済みの値を復元する。
  * オブジェクトのときは初期値のキーだけを採用し、型が食い違う項目は捨てる。
- * こうしないと、項目を増やしたときに未定義が混ざり、項目を減らしたときに
- * 古い残骸が居座って画面が壊れる。
+ * こうしないと、項目を増やしたときに未定義が混ざり、減らしたときに古い残骸が居座る。
  */
 function restore<T>(key: string, initial: T): T {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(key);
   } catch {
-    // プライベートモードなど localStorage 自体が触れない環境では初期値で動かす
+    // プライベートモードなど localStorage 自体が触れない環境では初期値で動かす。
     return initial;
   }
   if (raw === null) return initial;
@@ -43,7 +37,7 @@ function restore<T>(key: string, initial: T): T {
     return merged as T;
   }
 
-  // スカラーや配列はそのまま採用する（マージのしようがない）
+  // スカラーや配列はマージのしようがないのでそのまま採用する。
   return parsed as T;
 }
 
@@ -59,7 +53,7 @@ export function usePersistedState<T>(
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // 容量超過や保存禁止の環境では諦める。画面の動作は止めない。
+      // 容量超過や保存禁止の環境では諦める。画面は止めない。
     }
   }, [key, value]);
 

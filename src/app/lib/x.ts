@@ -1,10 +1,3 @@
-// 画面から取得層（src/x）を呼ぶための薄い層。
-//
-// サーバ版ではここに HTTP のラッパが入っていたが、拡張機能では同じバンドルの中なので直接呼ぶ。
-// 残っているのは 2 つだけで、どちらも画面側の都合である。
-//   1. 表示設定（Options）から取得条件（Filters）への読み替え。
-//   2. 読み直しに追い越された取得の扱い。
-
 import type { ActionRequest, Options, Source, TimelineResponse } from '../../shared/types.ts';
 import { actOnTweet } from '../../x/actions.ts';
 import { requestPermissions, sessionStatus } from '../../x/client.ts';
@@ -15,11 +8,9 @@ import { fetchMediaTimeline } from '../../x/timeline.ts';
 export { ApiError, requestPermissions };
 
 /**
- * タイムラインを 1 回分取得する。
- *
- * signal で止められるのは「結果を受け取るかどうか」だけである。
- * ライブラリに AbortSignal を渡す口が無いので、飛んだリクエストそのものは最後まで走る。
- * 取得元を切り替えた直後に古い応答が画面へ混ざらないようにするのが目的なので、これで足りる。
+ * signal で止められるのは結果を受け取るかどうかだけで、飛んだリクエストは最後まで走る
+ * （ライブラリに AbortSignal を渡す口が無い）。取得元を切り替えた直後に古い応答が
+ * 画面へ混ざらないようにするのが目的なので、これで足りる。
  */
 export async function fetchTimeline(p: {
   source: Source;
@@ -52,17 +43,14 @@ export function sendAction(body: ActionRequest): Promise<void> {
 
 /** 設定画面が出す状況。認証情報そのものは扱わないので、ここにも現れない。 */
 export interface ExtStatus {
-  /** x.com などへのホスト権限が下りているか。 */
   granted: boolean;
-  /** x.com にログインしているか。 */
   loggedIn: boolean;
-  /** 観測と貼り付けで溜まった queryId の上書き。既定値の全量ではない。 */
+  /** 観測と貼り付けで溜まった上書き。既定値の全量ではない。 */
   queryIds: Record<string, string>;
-  /** 同じく features の上書きの件数。 */
   featureCount: number;
 }
 
-/** 読み込みを始めてよいか。権限とログインの両方が要る。 */
+/** 読み込みを始めてよいか。 */
 export function isReady(s: ExtStatus): boolean {
   return s.granted && s.loggedIn;
 }

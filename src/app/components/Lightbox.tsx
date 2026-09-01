@@ -4,12 +4,11 @@ import type { Media, Tweet, TweetAction } from '../../shared/types';
 import { ext } from '../../ext/browser.ts';
 import type { TweetActionState } from '../hooks/useTweetActions';
 import { compact, mediaUrl, relTime } from '../lib/format';
-import { ActionBar } from './ActionBar';
+import { LightboxActionBar } from './ActionBar';
 import { Icon } from './Icon';
 
 /**
- * ライトボックスに並べる 1 枚分。
- * タイルは 1 ポストの複数メディアを束ねて表示するが、拡大表示は 1 枚ずつ送るので、
+ * タイルは 1 ポストの複数メディアを束ねるが、拡大表示は 1 枚ずつ送るので、
  * ここではポスト × メディアに展開した粒度で持つ。
  */
 export interface LightboxEntry {
@@ -29,13 +28,10 @@ export interface LightboxProps {
   onAction(tweet: Tweet, action: TweetAction): void;
 }
 
-/** 残りがこの件数を切ったら追加読み込みを促す（移植元と同じ閾値）。 */
+/** 残りがこの件数を切ったら追加読み込みを促す。 */
 const NEAR_END = 6;
 
-/**
- * ブラウザのダウンロードに渡す。
- * pbs.twimg.com の URL は末尾が拡張子を持たないので、format クエリから補ってやる。
- */
+/** pbs.twimg.com の URL は末尾が拡張子を持たないので、format クエリから補ってやる。 */
 function save(url: string): Promise<unknown> {
   let filename: string | undefined;
   try {
@@ -81,15 +77,13 @@ function trapTab(e: KeyboardEvent, root: HTMLElement): void {
 /** 墨地に浮かせる的。地も罫も持たせず、触れたときだけ罫と同じ薄い白を敷く。 */
 const LB_BTN = 'btn btn-ghost absolute z-2 p-0 text-lb-fg hover:bg-lb-line hover:text-lb-fg';
 
-/** 送り矢印。上下中央に置き、狭い画面では一回り小さくする。 */
 const LB_NAV = `${LB_BTN} top-1/2 h-16 w-11 -translate-y-1/2 max-sm:h-14 max-sm:w-9`;
 
-/** 舞台に載る写真と動画。 */
 const STAGE_MEDIA = 'max-h-full max-w-full rounded-sm object-contain';
 
 /**
- * 下の束に並ぶアイコン 1 つ。字が消えて 15px になったので、余白が無いと 15px 角の的しか残らない。
- * ここで 31px 角まで広げ、上下は margin で戻して、隣に並ぶ閲覧数や寸法の行を厚くしない。
+ * 下の束に並ぶアイコン 1 つ。余白が無いと 15px 角の的しか残らないので 31px 角まで広げ、
+ * 上下は margin で戻して、隣に並ぶ閲覧数や寸法の行を厚くしない。
  */
 const LB_LINK = 'inline-flex items-center -my-2 p-2 text-lb-dim hover:text-lb-fg hover:underline';
 
@@ -102,8 +96,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
   /** 開く直前にフォーカスがあった要素。閉じたらここへ返す。 */
   const restoreRef = useRef<HTMLElement | null>(null);
 
-  // 前後移動。移植元と同じく端では反対側へ回り込む。
-  // 負の剰余を避けるため length を足してからもう一度剰余を取る。
+  // 端では反対側へ回り込む。負の剰余を避けるため length を足してからもう一度剰余を取る。
   const move = useCallback(
     (delta: number) => {
       if (list.length === 0) return;
@@ -164,8 +157,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
     if (index > list.length - NEAR_END) nearEndRef.current();
   }, [visible, index, list.length]);
 
-  // React は muted を属性として出さないことがあり、その場合 GIF の自動再生がブラウザに拒否される。
-  // DOM プロパティを直接立てて確実にする。
+  // React は muted を属性として出さないことがあり、GIF の自動再生が拒否される。直接立てる。
   useEffect(() => {
     const v = videoRef.current;
     if (v) v.muted = entry?.media.type === 'animated_gif';
@@ -197,10 +189,8 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
       aria-modal="true"
       onClick={closeOnSelf}
     >
-      {/* 記号の文字（✕ ‹ ›）は字体次第で大きさも重心も揃わないので、アイコンに寄せる。
-          囲みは持たせない。狭い画面では舞台の余白が縮む一方でボタンの位置は据え置きなので、
-          枠があると写真の上に線が乗る。墨地の lb-fg のアイコンだけで十分読め、
-          押せることはホバーの地が伝える。その地は罫と同じ薄い白で、墨地から 1 段だけ持ち上げる。 */}
+      {/* 囲みは持たせない。狭い画面では舞台の余白が縮む一方でボタンの位置は据え置きなので、
+          枠があると写真の上に線が乗る。押せることはホバーの地だけで伝える。 */}
       <button
         ref={closeRef}
         className={`${LB_BTN} top-4 right-4 size-9`}
@@ -266,15 +256,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
           <div className="flex flex-wrap items-center gap-3">
             {/* 共有（URL のコピー）は下のリンク束ではなく操作ボタンの並びに置く。
                 あちらは「この画像をどう開くか」で、コピーの対象はポストだから。 */}
-            <ActionBar
-              tweet={tweet}
-              state={actions.get(tweet.id)}
-              onAction={onAction}
-              counts="all"
-              share
-              variant="lightbox"
-            />
-            {/* 下の束の gap は、字を持つ閲覧数・寸法・件数との間隔。 */}
+            <LightboxActionBar tweet={tweet} state={actions.get(tweet.id)} onAction={onAction} />
             <div className="flex flex-wrap items-center gap-4">
               {/* アイコンは aria-hidden なので、数だけでは何の数か伝わらない。 */}
               {tweet.stats.views ? (
@@ -285,10 +267,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
               <span>
                 {media.width}×{media.height}
               </span>
-              {/* 3 つとも字を落としてアイコンだけにした。Icon は aria-hidden なので、
-                  aria-label が無いとリンクもボタンも無名になる。落とした語はそのまま
-                  aria-label と title に移してあり、読み上げとホバーでは今までどおり出る。
-                  的を広げたぶん、アイコンどうしは隙間 0 の束にする。離れたままだと 3 つが
+              {/* 的を広げたぶん、アイコンどうしは隙間 0 の束にする。離れたままだと 3 つが
                   ひと束に見えず、押せる範囲も判らない。 */}
               <div className="flex items-center">
                 <a
@@ -311,8 +290,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
                 >
                   <Icon name="expand" />
                 </a>
-                {/* サーバ版は中継してファイル名を付けていた。拡張機能では downloads API がそれをやる。
-                    ダウンロード API を呼ぶので button だが、隣の 2 つと並ぶので見た目はリンクに揃える。 */}
+                {/* downloads API を呼ぶので button だが、隣の 2 つと並ぶので見た目はリンクに揃える。 */}
                 <button
                   type="button"
                   className={`${LB_LINK} cursor-pointer`}

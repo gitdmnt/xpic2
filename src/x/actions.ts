@@ -1,15 +1,7 @@
-// いいね・リポスト・ブックマークの実行と取り消し。
-//
-// 取得と違い、ライブラリのユーティリティ(PostApiUtils)は使わずに生成 API を直接叩く。
-// 理由は 2 つある。
-//   1. PostApiUtils はブックマークの作成・削除を持っていない。
-//   2. PostApiUtils は生成 API へ initOverrides を渡さないので、x-client-transaction-id が付かない。
-// どちらもこちら側では塞げないため、client.getPostApi().api（生成 API）を呼び、
-// 署名だけライブラリの client.initOverrides から借りる。
-// cookie・csrf・bearer は Configuration のミドルウェアが面倒を見るので、ここには出てこない。
-//
-// queryId の出どころは取得側とまったく同じで、既定値は placeholder.json、
-// 上書きは background.ts が観測した分だけ。ここに ID の表は無い。
+// ライブラリのユーティリティ(PostApiUtils)ではなく生成 API を直接叩く。PostApiUtils は
+// ブックマークの作成・削除を持たず、生成 API へ initOverrides を渡さないので
+// x-client-transaction-id も付かない。署名だけ client.initOverrides から借りる。
+// cookie・csrf・bearer は Configuration のミドルウェアが見るので、ここには出てこない。
 
 import type { TwitterOpenApiClient } from 'twitter-openapi-typescript';
 
@@ -33,8 +25,6 @@ interface Operation {
 }
 
 /**
- * 操作と GraphQL オペレーションの対応。
- *
  * variables は生成モデルの camelCase で書く。スネークケースへの読み替えは
  * 生成側の ToJSON が行うので、ここで tweet_id と書いてはいけない。
  * dark_request は x.com のクライアントが常に false を送っているので、それに倣う。
@@ -107,16 +97,13 @@ const OPERATIONS: Record<TweetAction, { on: Operation; off: Operation }> = {
   },
 };
 
-/** 上書き指定の案内とテスト用に、使っているオペレーション名を公開する。 */
+/** 上書き指定の案内とテストで使う。 */
 export const ACTION_ENDPOINTS: readonly string[] = Object.values(OPERATIONS).flatMap((pair) => [
   pair.on.name,
   pair.off.name,
 ]);
 
-/**
- * 「もうその状態になっている」ことを意味する X のエラーコード。
- * 要求した結果と現実が一致しているので、失敗として見せる意味がない。
- */
+/** 要求した結果と現実が既に一致しているので、失敗として見せる意味がない。 */
 const ALREADY_DONE = new Set([
   139, // Already favorited
   327, // Already retweeted
@@ -145,11 +132,7 @@ async function ensureAccepted(raw: Response, endpoint: string): Promise<void> {
   throw new ApiError(502, `X が ${endpoint} を拒否しました。`, message.slice(0, 300));
 }
 
-/**
- * 1 つのポストへ操作を掛ける。成功なら何も返さない（要求どおりの状態に落ち着いている）。
- *
- * @param on 真なら実行、偽なら取り消し。
- */
+/** @param on 真なら実行、偽なら取り消し。 */
 export async function actOnTweet(id: string, action: TweetAction, on: boolean): Promise<void> {
   // id は URL のパスではなく本文に載るが、数字以外を通す理由が無いので入口で弾く。
   if (!/^\d+$/.test(id)) throw new ApiError(400, 'ポストの id が不正です。');

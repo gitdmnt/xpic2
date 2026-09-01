@@ -1,7 +1,5 @@
-// ツールバーとインストール画面に出すアイコンを、その場で描いて PNG にする。
-//
-// 画像をリポジトリに置かないのは、色を変えたときに描き直し忘れた差分が残らないようにするため。
-// 図柄は masonry の列を 4 つの矩形で表している。画面のヘッダのロゴは藍鼠の四角 1 つで、こちらとは別物。
+// ツールバーのアイコンをその場で描いて PNG にする。画像を置くと、色を変えたときに
+// 描き直し忘れた差分が残るため。
 // 同じ図柄を index.html の favicon にも直書きしてあるので、色を変えるときは両方を揃える。
 
 import { deflateSync } from 'node:zlib';
@@ -30,10 +28,7 @@ function inside(px: number, py: number, x: number, y: number, w: number, h: numb
   return (px - cx) ** 2 + (py - cy) ** 2 <= r * r;
 }
 
-/**
- * RGBA を描く。小さいサイズでも角が汚くならないよう 3x3 で重ね取りする。
- * 本格的なアンチエイリアスではないが、16px でも輪郭が保つ程度には効く。
- */
+/** RGBA を描く。16px でも角が保つよう 3x3 で重ね取りする。 */
 function render(size: number): Uint8Array {
   const s = size / 32;
   const px = new Uint8Array(size * size * 4);

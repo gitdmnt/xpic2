@@ -1,8 +1,5 @@
-// masonry の配置計算。
-//
-// X の API は画像の実寸（original_info）を返す。だから画像の読み込みを待たずに
-// 高さを確定でき、読み込み完了のたびに再配置するタイプのガタつきが起きない。
-// 配置そのものは「最も低い列へ順に積む」だけの純粋関数で、副作用を持たない。
+// X の API が画像の実寸（original_info）を返すので、読み込みを待たずに高さを確定できる。
+// 読み込み完了のたびに再配置するタイプのガタつきは起きない。
 
 import { useEffect, useMemo, useState } from 'react';
 import type { RefObject } from 'react';
@@ -55,7 +52,6 @@ function computeMasonry(p: MasonryParams): MasonryResult {
   }
 
   const cols = resolveColumns(containerWidth, columns, gap);
-  // 幅は設定に持たない。決まった列数に対して、余白を差し引いた残りを等分する。
   const width = (containerWidth - gap * (cols - 1)) / cols;
   const heights = new Array<number>(cols).fill(0);
 
@@ -89,10 +85,7 @@ export function useMasonry(p: MasonryParams): MasonryResult {
   );
 }
 
-/**
- * 要素の幅を測る。
- * 幅が確定するまでは 0 を返すので、呼び出し側は 0 のあいだ描画を止める。
- */
+/** 幅が確定するまでは 0 を返す。呼び出し側は 0 のあいだ描画を止める。 */
 export function useElementWidth<T extends HTMLElement>(ref: RefObject<T | null>): number {
   const [width, setWidth] = useState(0);
 

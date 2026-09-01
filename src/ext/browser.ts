@@ -1,9 +1,8 @@
-// Chrome と Firefox の拡張 API の差を 1 か所に閉じ込める。
+// Firefox は `browser`、Chrome は `chrome` を生やす。MV3 ではどちらも promise を返すので、
+// 掴んだ方をそのまま await できる。
 //
-// Firefox は promise を返す `browser`、Chrome は `chrome` を生やす。
-// Chrome の `chrome` も MV3 では promise を返すので、どちらを掴んでも await できる。
-// 型は使う分だけをここで宣言する。@types/chrome を足すと Firefox 側の差が消えてしまい、
-// 「両方で動く範囲」がコードから読み取れなくなるため。
+// 型は使う分だけをここで宣言する。@types/chrome を足すと Firefox 側の差が消えて、
+// 両方で動く範囲がコードから読み取れなくなる。
 
 interface Cookie {
   value: string;
@@ -45,18 +44,13 @@ export interface BrowserApi {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var browser: BrowserApi | undefined;
-  // eslint-disable-next-line no-var
   var chrome: BrowserApi | undefined;
 }
 
 /**
- * 拡張 API を取り出す。
- *
- * 定数ではなく関数なのは、読み込んだ時点で解決すると拡張の外（テストなど）で
- * import しただけで落ちるためである。呼ぶ側が実際に使う瞬間まで解決を遅らせる。
- * テストは globalThis.chrome に差し替えを置けばよい。
+ * 定数ではなく関数なのは、読み込んだ時点で解決すると拡張の外（テストなど）では
+ * import しただけで落ちるため。テストは globalThis.chrome に差し替えを置けばよい。
  */
 export function ext(): BrowserApi {
   const api = globalThis.browser ?? globalThis.chrome;

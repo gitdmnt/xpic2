@@ -1,13 +1,9 @@
-// Buffer の穴埋め。
-//
-// x-client-transaction-id-generater（署名の生成元）は Node の Buffer を base64 の変換だけに使う。
-// ブラウザには Buffer が無いので、実際に使われている 3 つの形だけを atob / btoa で埋める。
-// buffer パッケージを丸ごと持ち込むと数十 KB になり、その大半は使わない。
-//
-// 埋めていない使い方が来たら例外にする。黙って別の値を返すと、署名が通らない理由が
-// 「queryId が古い」と見分けられなくなるため。
+// x-client-transaction-id-generater（署名の生成元）が Node の Buffer を base64 の変換にだけ使う。
+// buffer パッケージは数十 KB でその大半を使わないので、実際に来る 3 つの形だけを atob / btoa で埋める。
+// 埋めていない使い方は例外にする。黙って別の値を返すと、署名が通らない理由を queryId の古さと
+// 見分けられなくなる。
 
-/** base64 の入出力だけを足した Uint8Array。subarray や Array.from はそのまま効く。 */
+/** base64 の入出力だけを足した Uint8Array。 */
 class Base64Bytes extends Uint8Array {
   override toString(encoding?: string): string {
     if (encoding !== 'base64') {
@@ -34,10 +30,7 @@ function from(input: string | ArrayLike<number>, encoding?: string): Base64Bytes
 
 export const bufferShim = { from };
 
-/**
- * globalThis.Buffer が無ければ置く。
- * 既にあるなら本物なので触らない（Bun でのテスト実行がこれに当たる）。
- */
+/** 既にあるなら本物なので触らない（Bun でのテスト実行がこれに当たる）。 */
 export function installBufferShim(): void {
   const g = globalThis as { Buffer?: unknown };
   g.Buffer ??= bufferShim;

@@ -9,6 +9,7 @@
     "build": "bun build.ts",
     "build:firefox": "bun build.ts --firefox",
     "watch": "bun build.ts --watch",
+    "watch:firefox": "bun build.ts --watch --firefox",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "knip": "knip-bun"

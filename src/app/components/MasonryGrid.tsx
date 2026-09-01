@@ -24,10 +24,10 @@ interface MasonryGridProps {
   onAction(tweet: Tweet, action: TweetAction): void;
 }
 
-/** タイル間の余白。タイルの座標は JS で計算するので、CSS ではなくここが余白の唯一の出どころ（Node 版の GAP と同じ値）。 */
+/** タイルの座標は JS で計算するので、CSS ではなくここが余白の唯一の出どころ。 */
 const GAP = 12;
 
-/** 極端な縦長・横長は列を壊すので、Node 版と同じ範囲に丸める。 */
+/** 極端な縦長・横長は列を壊すので範囲を丸める。 */
 function aspectOf(media: Media): number {
   const w = media.width || 1;
   const h = media.height || 1;

@@ -1,10 +1,6 @@
-// タイムラインの取得と蓄積。
-//
-// 面倒なのは 3 点で、いずれも X 側の都合に由来する。
-//   1. メディアの無いページが返ることがある（おすすめ・フォロー中・ブックマークで顕著）。
-//      新規 0 件でカーソルが残っているあいだは自動で先へ進める。
-//   2. 読み直しと進行中のリクエストが競合する。世代番号で古い応答を捨てる。
-//   3. 同じポストが別のページに再び現れる。id で重複排除する。
+// X 側の都合が 3 つある。メディアの無いページが返ること、読み直しと進行中のリクエストが
+// 競合すること、同じポストが別のページに再び現れること。順に、空ページを跨いで先へ進む、
+// 世代番号で古い応答を捨てる、id で重複排除する、で捌く。
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Options, Source, Tweet } from '../../shared/types.ts';
@@ -23,7 +19,6 @@ export interface TimelineState {
   error: TimelineError | null;
   /** 続きを読む。読み込み中と終端では何もしない。 */
   load: () => void;
-  /** 先頭から読み直す。 */
   reload: () => void;
 }
 
@@ -158,7 +153,6 @@ export function useTimeline({ source, query, opts, enabled }: UseTimelineParams)
     // StrictMode の二重実行では 1 回目が中断され、2 回目の世代だけが結果を反映する。
   }, [source, query, filterKey, enabled, run]);
 
-  // 画面から消えるときに進行中のリクエストを残さない。
   useEffect(() => () => runRef.current.controller?.abort(), []);
 
   return { tweets, loading, done, error, load, reload };

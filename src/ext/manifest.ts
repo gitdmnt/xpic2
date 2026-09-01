@@ -1,11 +1,8 @@
-// manifest を組み立てる。
-//
-// Chrome と Firefox で違うのは background の書き方と、Firefox が要求する拡張 ID だけである。
-// JSON を 2 つ置くと大半が重複し、片方だけ直す事故が起きるので、差分だけをここに書く。
+// JSON を 2 つ置くと大半が重複し、片方だけ直す事故が起きるので、target ごとの差分だけをここに書く。
 
 export type Target = 'chrome' | 'firefox';
 
-/** ここに挙げた宛先だけへ届けば足りる。x.com が本体、GitHub は queryId の既定値の取得元。 */
+/** x.com が本体、GitHub は queryId の既定値の取得元。 */
 const HOST_PERMISSIONS = [
   'https://x.com/*',
   'https://api.x.com/*',
@@ -20,10 +17,9 @@ export function manifest(target: Target, version: string): Record<string, unknow
     name: 'xpic2',
     version,
     description: 'X の画像付きポストだけを masonry で並べて眺めるビューア。',
-    // cookies は x-csrf-token に使う ct0 を読むため、webRequest は queryId を観測するため。
-    // downloads は原寸の保存、storage は queryId の上書きの保管に使う。
-    // clipboardWrite は共有ボタンの URL コピー。押した瞬間の操作から呼ぶので本来は要らないが、
-    // 利用者が押してから応答が返るまでの間に操作の有効期限が切れると拒否されるため、明示して塞ぐ。
+    // cookies は x-csrf-token の ct0、webRequest は queryId の観測、downloads は原寸の保存、
+    // storage は queryId の上書きの保管。clipboardWrite は、押してから応答が返るまでに
+    // 操作の有効期限が切れるとコピーが拒否されるため明示する。
     permissions: ['storage', 'cookies', 'downloads', 'webRequest', 'clipboardWrite'],
     host_permissions: HOST_PERMISSIONS,
     icons: ICONS,

@@ -1,14 +1,9 @@
 /**
- * twitter-openapi-typescript の型から、このアプリの `Tweet` / `Media` へ写す。
+ * ライブラリは JSON を生成モデルへ通すが、`FromJSONTyped` は実行時検証をしない。型が
+ * `width: number` でも X が値を落とせば `undefined` が流れてくる。masonry は画像の実寸から
+ * 高さを確定するので、欠けると描画が崩れる。型を信用せず、検証してから積み替える。
  *
- * ライブラリは JSON を生成モデルへ通してくれるが、`FromJSONTyped` は実行時検証をしない。
- * 型が `width: number` でも X が値を落とせば `undefined` がそのまま流れてくる。
- * masonry は画像の実寸から先に高さを確定してガタつきを防いでいるので、
- * width / height が欠けると描画そのものが崩れる。ここでは型を信用せず、
- * 必要な値をすべて `unknown` 相当として検証してから積み替える。
- *
- * 生成モデルの型は `twitter-openapi-typescript-generated` にあるが、
- * package.json の依存は `twitter-openapi-typescript` だけなので、
+ * 生成モデルの型は依存に入れていない `twitter-openapi-typescript-generated` にあるので、
  * 直接 import せず `TweetApiUtilsData` から辿って取り出す。
  */
 
@@ -52,11 +47,9 @@ function toMediaType(value: unknown): MediaType | null {
 }
 
 /**
- * 表示に使う寸法を決める。
- *
  * `originalInfo` → `sizes.large` → `videoInfo.aspectRatio` の順に落とす。
- * 幅と高さは必ず同じ出所から取る。別々の出所を混ぜると縦横比が狂い、
- * masonry が確保する高さと実際の画像がずれてレイアウトがガタつく。
+ * 幅と高さは必ず同じ出所から取る。混ぜると縦横比が狂い、masonry が確保する高さと
+ * 実際の画像がずれてガタつく。
  */
 function mediaSize(entry: MediaEntry): { width: number; height: number } {
   const ow = toSize(entry.originalInfo?.width);
@@ -102,7 +95,6 @@ function bestVariant(videoInfo: MediaEntry['videoInfo']): string | null {
 
 function mapMedia(entry: MediaEntry): Media | null {
   if (typeof entry !== 'object' || entry === null) return null;
-  // URL の無いメディアは表示できないので捨てる
   const url = toText(entry.mediaUrlHttps);
   if (!url) return null;
   const type = toMediaType(entry.type);
@@ -155,10 +147,7 @@ function mapUser(user: XUser | undefined): Tweet['user'] {
   };
 }
 
-/**
- * 自分がそのポストへ既に掛けた操作。欠けていれば「まだ掛けていない」に寄せる。
- * 未ログインでも項目ごと落ちてくるので、undefined を偽として扱って構わない。
- */
+/** 未ログインでも項目ごと落ちてくるので、undefined は「掛けていない」として扱ってよい。 */
 function mapViewer(legacy: XLegacy | undefined): TweetViewerState {
   return {
     liked: Boolean(legacy?.favorited),
@@ -167,10 +156,7 @@ function mapViewer(legacy: XLegacy | undefined): TweetViewerState {
   };
 }
 
-/**
- * リポストと引用を辿らずに 1 件を写す。
- * `mapTweet` から呼ぶ内部関数。RT のラッパ剥がしはそちらの責務。
- */
+/** リポストと引用を辿らずに 1 件を写す。ラッパ剥がしは `mapTweet` の責務。 */
 function mapCore(data: TweetApiUtilsData): Tweet | null {
   const tweet: XTweet | undefined = data.tweet;
   if (!tweet) return null;
@@ -179,7 +165,6 @@ function mapCore(data: TweetApiUtilsData): Tweet | null {
   // extendedEntities が本命。entities.media は 1 枚目しか入らないことがあるので予備。
   const extended = mediaList(legacy?.extendedEntities?.media);
   const media = extended.length ? extended : mediaList(legacy?.entities?.media);
-  // 画像も動画も無いポストはこのアプリの対象外
   if (!media.length) return null;
 
   const id = toText(legacy?.idStr) ?? toText(tweet.restId);
@@ -216,10 +201,7 @@ function mapCore(data: TweetApiUtilsData): Tweet | null {
 }
 
 /**
- * 1 件のポストを写す。メディアが無ければ null。
- *
- * 広告は写さない。タイムラインのエントリに `promotedMetadata` が載るのは広告だけで、
- * ライブラリがそれをここまで持ち上げてくれる。本文や作者から推し量る必要はない。
+ * `promotedMetadata` が載るのは広告だけなので、本文や作者から推し量らずにこれで弾く。
  *
  * リポストは元ポストを実体にする。外側は作者も本文も "RT @..." のラッパでしかないので、
  * `retweeted` の中身を採用し、リポストした人だけを `retweetedBy` に残す。
@@ -241,10 +223,7 @@ export function mapTweet(data: TweetApiUtilsData): Tweet | null {
   return mapCore(data);
 }
 
-/**
- * タイムライン 1 ページ分を写す。
- * 1 件の変換失敗でページ全体を落とさないよう、個別に try で握る。
- */
+/** 1 件の変換失敗でページ全体を落とさないよう、個別に try で握る。 */
 export function mapTimeline(
   res: TimelineApiUtilsResponse<TweetApiUtilsData>,
 ): { items: Tweet[]; cursor: string | null } {
@@ -268,10 +247,7 @@ export function mapTimeline(
   return { items, cursor: toText(res?.cursor?.bottom?.value) ?? null };
 }
 
-/**
- * 画像/動画の種類とリポスト・リプライ可否でふるいにかける。
- * 旧 parse.ts と同じ挙動。x-api.ts がページングの各周で使う。
- */
+/** 画像/動画の種類とリポスト・リプライ可否でふるいにかける。 */
 export function filterItems(items: Tweet[], filters: Partial<Filters> = {}): Tweet[] {
   const { photos = true, videos = true, gifs = true, retweets = true, replies = true } = filters;
   const allow = new Set<MediaType>();

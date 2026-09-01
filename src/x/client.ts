@@ -1,13 +1,9 @@
-// twitter-openapi-typescript のクライアント生成と、queryId の上書き。
+// cookie は保管も送信もしない。拡張機能のページから x.com へ投げたリクエストに、ブラウザが
+// 自分の cookie を載せる。こちらが用意するのは x-csrf-token だけで、HttpOnly でない ct0 から作る。
 //
-// サーバ版との違いは認証の持ち方にある。cookie はこちらでは保管も送信もしない。
-// 拡張機能のページから x.com へ投げたリクエストに、ブラウザが自分の cookie を載せる。
-// こちらが用意するのは x-csrf-token だけで、これは HttpOnly でない ct0 から作る。
-//
-// 方針は「既定値はライブラリ、queryId だけこちらで上書きできる」。
-// ライブラリは placeholder.json（queryId と features の表）を実行時に取得するが、
-// その中身は配信時点のスナップショットで、X のローテーションに遅れる。
-// background.ts が観測した値で、必要な分だけ差し替える。
+// 既定値はライブラリが実行時に取る placeholder.json（queryId と features の表）が持つ。
+// 中身は配信時点のスナップショットで X のローテーションに遅れるので、background.ts が
+// 観測した値で必要な分だけ差し替える。
 
 import { TwitterOpenApi, type TwitterOpenApiClient } from 'twitter-openapi-typescript';
 import { ext, REQUIRED_ORIGINS } from '../ext/browser.ts';
@@ -15,14 +11,12 @@ import { ApiError } from './error.ts';
 import { loadFlags } from './flags.ts';
 
 /**
- * ライブラリの fetch を差し替える。
- *
  * 既定の fetch は credentials が same-origin なので、chrome-extension:// のページから
- * x.com を叩いても cookie が載らない。載せるのは x.com 宛だけに絞る。
- * GitHub から取る placeholder.json などにまで cookie を送る理由が無いため。
+ * x.com を叩いても cookie が載らない。載せるのは x.com 宛だけに絞る。GitHub から取る
+ * placeholder.json などにまで cookie を送る理由が無いため。
  *
- * ライブラリはこのあと cookie ヘッダを自分で立てるが、Cookie は禁止ヘッダ名なので
- * ブラウザが落とす。落とされて正しい。ここで載せたいのはブラウザ自身が持つ本物である。
+ * ライブラリはこのあと cookie ヘッダを自分で立てるが、Cookie は禁止ヘッダ名なのでブラウザが
+ * 落とす。落とされて正しい。ここで載せたいのはブラウザ自身が持つ本物である。
  */
 TwitterOpenApi.fetchApi = (input, init) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -50,8 +44,6 @@ function isFlagEntry(v: unknown): v is FlagEntry {
 }
 
 /**
- * queryId を差し替える。
- *
  * flag は queryId と @path の両方に ID を持ち、リクエスト URL は前者、
  * x-client-transaction-id の署名は後者から作られる（api.js の initOverrides）。
  * 片方だけ直すと署名がパスと食い違うので、必ず両方を書き換える。
@@ -129,7 +121,6 @@ function cacheKey(ct0: string, flags: unknown): string {
 }
 
 /**
- * クライアントを取得する。
  * 生成は placeholder.json と pair.json の取得を伴うので、条件が同じあいだは使い回す。
  * 画面はタブとして開きっぱなしなので、この使い回しはそのまま効く。
  */

@@ -1,6 +1,5 @@
-// 画面全体の状態はこのコンポーネントが持つ。
-// 子コンポーネントは受け取った値を描くだけにして、取得条件・表示設定・ライトボックス位置の
-// 唯一の持ち主をここに集約する（Node 版の state オブジェクトに相当）。
+// 取得条件・表示設定・ライトボックス位置の唯一の持ち主。
+// 子コンポーネントは受け取った値を描くだけにする。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Media, Options, Source } from '../shared/types.ts';
@@ -63,7 +62,7 @@ function writeLocal(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // 保存できなくても今回のセッションは動くので無視する
+    // 保存できなくても今回のセッションは動く。
   }
 }
 
@@ -104,8 +103,8 @@ export function App() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('display');
   const [lbIndex, setLbIndex] = useState(-1);
 
-  // どのタブを開くかは呼ぶ側が決める。自分で設定を開いた人が見たいのは表示設定だが、
-  // こちらが勝手に開くのは接続が整っていないときだけなので、開く理由ごとに行き先が違う。
+  // どのタブを開くかは呼ぶ側が決める。自分で開いた人が見たいのは表示設定で、こちらが勝手に
+  // 開くのは接続が整っていないときだけなので、開く理由ごとに行き先が違う。
   const openSettings = useCallback((tab: SettingsTab) => {
     setSettingsTab(tab);
     setSettingsOpen(true);
@@ -124,7 +123,6 @@ export function App() {
     enabled,
   });
 
-  // いいね・リポスト・ブックマークは取得と独立に動く。押した結果はこちらが覚える。
   const {
     actions,
     toggle: handleAction,
@@ -132,9 +130,8 @@ export function App() {
     dismissError,
   } = useTweetActions(tweets);
 
-  // 拾った投稿を少し置いてから壁から外すのは、おすすめとフォロー中だけ。
-  // 自分で並びを決めて開いた画面（ユーザー・検索・ブックマーク）では、
-  // 見えているものが勝手に減るほうが困るので掃わない。
+  // 掃うのはおすすめとフォロー中だけ。自分で並びを決めて開いた画面では、
+  // 見えているものが勝手に減るほうが困る。
   const sweeping = opts.sweep > 0 && (request.source === 'foryou' || request.source === 'following');
   // 待ち時間を止める合図には lbIndex を使う。丸めた lightboxIndex は tiles から導くので、
   // ここで見ると tiles → dismissed → tiles の輪になる。
@@ -143,8 +140,7 @@ export function App() {
   // ── タイルとライトボックスの導出 ─────────────────────────────
   // split が真なら 1 メディア 1 タイル、偽なら 1 投稿 1 タイル（group は投稿の全メディア）。
   // ライトボックスはタイル順に group を展開した並びなので、lbIndex はその先頭位置になる。
-  // なお width/height の 0.42〜3 クランプは、タイルの実寸を扱う MasonryGrid 側で一度だけ行う
-  // （TileItem は生の Media を運ぶ契約なので、ここでクランプ済みの値を渡す口が無い）。
+  // 縦横比のクランプは、TileItem が生の Media を運ぶ契約なので MasonryGrid 側で行う。
   const tiles = useMemo<TileItem[]>(() => {
     const out: TileItem[] = [];
     let lb = 0;
@@ -276,7 +272,7 @@ export function App() {
     (i: number) => {
       const n = entries.length;
       if (n === 0) return;
-      // 端で止めずに巻き戻す（Node 版と同じ）。
+      // 端で止めずに巻き戻す。
       setLbIndex(((i % n) + n) % n);
     },
     [entries.length],
@@ -310,15 +306,13 @@ export function App() {
       );
     }
     if (configured === true && !enabled && tiles.length === 0) {
-      // 「読み込む」ボタンはアイコンだけになり、名前で指せなくなった。押す先を語らず、要るものだけ言う。
+      // 「読み込む」はアイコンだけで名前を持たない。押す先を語らず、要るものだけ言う。
       return <>{source === 'search' ? '検索語を入力' : 'ユーザー名を入力'}</>;
     }
     if (done) {
-      // 終端は罫 1 本で足りる。ただし 0 件のときは引く罫の上に何も無く、線だけでは伝わらない。
-      // 飾りではなく終いの印なので、罫 1 本ぶんの太さと、字より短い 40px に留める。
-      // line-strong なのは、1px の罫が 1 本だけ孤立して置かれ、他に手掛かりが無いため。
-      // ここで見るのはタイルではなく取得できた投稿。拾って壁から外したぶんで空になったときに
-      // 「見つかりません」と言うと、集まらなかったのか掃い終えたのかが逆に伝わる。
+      // 終端は罫 1 本で足りるが、0 件のときは罫の上に何も無く、線だけでは伝わらない。
+      // 見るのはタイルではなく取得できた投稿。掃って空になったときに「見つかりません」と言うと、
+      // 集まらなかったのか掃い終えたのかが逆に伝わる。
       return tweets.length === 0 ? <>見つかりません</> : <hr className="mx-auto my-2 w-10 border-t border-line-strong" />;
     }
     return null;
@@ -335,16 +329,13 @@ export function App() {
         // 準備が済むまでは接続へ振る。未接続の本文は文言だけで、設定へ入る導線が歯車しか無いため。
         onOpenSettings={() => openSettings(configured === false ? 'connection' : 'display')}
         queryInputRef={queryInputRef}
-        mediaCount={tiles.length}
-        tweetCount={tweets.length}
       />
 
       <main className="p-4 max-sm:p-3">
         <MasonryGrid tiles={tiles} opts={opts} onOpen={setLbIndex} actions={actions} onAction={handleAction} />
         {/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */}
         <div ref={sentinelRef} className="h-px" />
-        {/* 読み込み中に出るのは円 1 つだけなので、字の 1 行分を見込んだ余白では円が宙に浮く。
-            上下とも詰め、下だけ厚くする（頁の終いの余白をここが持つため）。 */}
+        {/* 上下を詰め、下だけ厚くする（頁の終いの余白をここが持つため）。 */}
         <div className="px-4 pt-6 pb-10 text-center text-fg-dim">{status}</div>
       </main>
 

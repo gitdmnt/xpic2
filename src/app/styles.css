@@ -1,8 +1,6 @@
 /* xpic2 の全スタイル。
  *
- * 見た目は Tailwind の実用クラスで各コンポーネントに直接書く。このファイルが持つのは 3 つだけで、
- * 配色と寸法の語彙（@theme）、素の要素の既定（@layer base）、画面じゅうで使い回す
- * 押せるもの（@layer components）である。個別の余白や並べ方はここに書かない。
+ * 見た目は Tailwind の実用クラスで各コンポーネントに直接書く。個別の余白や並べ方はここに書かない。
  *
  * 地は生成り、文字は墨、差し色は藍鼠の 1 点だけ。写真がいちばん強い要素になるように、
  * 囲み（罫・影・角丸・彩度）はどれも主張を落としてある。
@@ -22,9 +20,10 @@
  */
 
 @import 'tailwindcss';
-/* アイコン字体。層に入れずそのまま重ねる。触るのは fi-rr-* の ::before だけなので、
+/* アイコン字体。層に入れずそのまま重ねる。触るのは fi-rr-* / fi-sr-* の ::before だけなので、
    実用クラスと取り合いにならない。 */
 @import '@flaticon/flaticon-uicons/css/regular/rounded.css';
+@import '@flaticon/flaticon-uicons/css/solid/rounded.css';
 
 /* ホバーの無い端末。触れないと見えないボタンを、その端末でだけ出しっぱなしにするために使う。 */
 @custom-variant no-hover (@media (hover: none));

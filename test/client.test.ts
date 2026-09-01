@@ -1,4 +1,3 @@
-// queryId 上書きの検証。
 // リクエスト URL は flag.queryId、x-client-transaction-id の署名は flag['@path'] から
 // 作られるため、両方が同時に、かつ矛盾なく書き換わることが要件になる。
 

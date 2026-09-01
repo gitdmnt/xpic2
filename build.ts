@@ -1,13 +1,6 @@
-// 拡張機能を dist/ へ組み立てる。
-//
-//   bun run build            Chrome / Edge 向け
-//   bun run build:firefox    Firefox 向け
-//   bun run watch            保存のたびに組み直す（--firefox も付けられる）
-//
-// 画面は index.html を入口にして Bun に任せる。相対 import をたどって main.tsx と styles.css を
-// まとめ、ハッシュ付きの名前で吐いてくれるので、こちらで並べる資産の一覧を持たなくてよい。
-// styles.css は bun-plugin-tailwind が横取りして Tailwind を通す。使っているクラスは
-// この同じバンドルが辿った tsx から集まるので、拾い先の一覧もこちらで持たなくてよい。
+// 画面は index.html を入口にして Bun に任せる。相対 import をたどって資産をまとめてくれるので、
+// 並べる一覧をこちらで持たなくてよい。styles.css は bun-plugin-tailwind が横取りして Tailwind を
+// 通し、拾うクラスも同じバンドルが辿った tsx から集まる。
 // background だけは別に組む。MV3 の service worker と Firefox の event page はどちらも
 // 単体のファイルとして読まれるので、import を残さない iife にする。
 
@@ -73,10 +66,8 @@ console.log(
 );
 
 if (watching) {
-  // 保存のたびに組み直すだけで、ブラウザ側の再読み込みまでは面倒を見ない。
-  // 自動で反映させるには拡張機能から reload を呼ぶ仕掛けが要り、そのために
-  // 開発用のサーバを常駐させることになる。サーバを無くしたのが拡張機能にした理由なので、
-  // ここでは組み直しで止めて、反映はブラウザ側の再読み込みに任せる。
+  // 組み直すだけで、反映はブラウザ側の再読み込みに任せる。自動で反映させるには開発用のサーバを
+  // 常駐させることになり、それを無くしたのが拡張機能にした理由なので、ここでは踏み込まない。
   let timer: ReturnType<typeof setTimeout> | undefined;
   watch('src', { recursive: true }, () => {
     clearTimeout(timer);

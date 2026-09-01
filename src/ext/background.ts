@@ -1,14 +1,8 @@
-// バックグラウンド。役目は 2 つだけで、どちらも画面を開いていなくても動く必要がある。
+// X は queryId を随時ローテーションさせるので、表を同梱しても必ず古びる。本人のブラウザが
+// いま実際に使っている値を横で観測すれば、貼り付け作業なしに追従できる。
 //
-//   1. 利用者の x.com のタブが投げている GraphQL リクエストを観測し、queryId と features を拾う。
-//   2. ツールバーのアイコンから画面を開く。
-//
-// 1 がこの拡張機能の要点である。X は queryId を随時ローテーションさせるので、
-// 表を同梱しても必ず古びる。本人のブラウザが「いま実際に使っている値」を横で見ていれば、
-// 貼り付け作業なしに追従できる。
-//
-// 取得と操作そのものはここでは行わない。拡張機能のページ側で完結させている。
-// service worker は数十秒で止められるため、無限スクロールのような長い作業を置く場所ではない。
+// 取得と操作そのものは画面側に置く。service worker は数十秒で止められるので、
+// 無限スクロールのような長い作業をここへ置けない。
 
 import { ext, type WebRequestDetails } from './browser.ts';
 import { fromUrl, mergeFlags, parseFeatures } from '../x/flags.ts';
@@ -21,7 +15,7 @@ function featuresFromBody(details: WebRequestDetails): Record<string, boolean> |
     const body: unknown = JSON.parse(new TextDecoder().decode(raw));
     if (typeof body !== 'object' || body === null) return null;
     const features = (body as { features?: unknown }).features;
-    // 本文の features は既に JSON なので、文字列へ戻してから共通の検証に通す。
+    // 既に JSON なので、共通の検証へ通すために文字列へ戻す。
     return features === undefined ? null : parseFeatures(JSON.stringify(features));
   } catch {
     return null;
@@ -45,7 +39,7 @@ function observe(details: WebRequestDetails): void {
   // 変化が無ければ mergeFlags は書き込まない。x.com を眺めているあいだ毎秒呼ばれる経路なので、
   // ここで握り潰さないと storage への書き込みが際限なく増える。
   void mergeFlags(patch).catch(() => {
-    // 権限が無い・storage が使えないなどはここでは何もできない。次の観測に任せる。
+    // 権限が無い・storage が使えないなどはここでは手が無い。次の観測に任せる。
   });
 }
 

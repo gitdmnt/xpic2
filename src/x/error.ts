@@ -1,13 +1,9 @@
-// X の失敗を、画面にそのまま出せる形へ写す。
-//
-// 取得（timeline.ts）と操作（actions.ts）で同じ言い回しを使いたいのでここに置いてある。
-// 「どのエンドポイントで」「どの queryId で」失敗したかを名指しできることが要件で、
-// それが無いと利用者はどのリクエストを見に行けばよいか分からない。
+// どのエンドポイントで、どの queryId で失敗したかを名指しできることが要件になる。
+// それが無いと、利用者はどのリクエストを見に行けばよいか分からない。
 
 import type { TwitterOpenApiClient } from 'twitter-openapi-typescript';
 
 /**
- * 画面に出す失敗。
  * status は X が返した HTTP ステータス（届かなかったときは 0）。
  * 401 なら再ログインへ、404 なら queryId の更新へ、と画面側が分岐するために持つ。
  */
@@ -24,8 +20,6 @@ export class ApiError extends Error {
 }
 
 /**
- * fetch の Response らしきもの。
- *
  * ライブラリは ResponseError(response を持つ)を投げるが、それが常とは限らない。
  * FetchError のように cause に包む形も、GraphQL エラーを素の Error にした形もある。
  * instanceof は realm やバンドルの二重化で簡単に外れるので、形だけを見る。
@@ -122,7 +116,6 @@ export function toApiError(e: unknown, endpoint: string, queryId: string | null)
     );
   }
 
-  // ステータスが取り出せた場合と、そうでない場合。どちらも 502 に寄せて元のメッセージを添える。
   if (res) {
     return new ApiError(502, `X が ${endpoint} で HTTP ${res.status} を返しました。`, message.slice(0, 300) || null);
   }

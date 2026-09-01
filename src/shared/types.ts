@@ -1,5 +1,3 @@
-// 取得層（src/x）と画面（src/app）で共有する型。両者の契約はここが唯一の正。
-
 export type MediaType = 'photo' | 'video' | 'animated_gif';
 
 export interface Media {
@@ -17,7 +15,7 @@ export interface Media {
 }
 
 /**
- * ポストの作者。いまは Tweet 経由でしか触らないが、共有する型の定義はこの 1 ファイルに揃える。
+ * Tweet 経由でしか触らないが、共有する型の定義はこの 1 ファイルに揃える。
  * @public
  */
 export interface UserRef {
@@ -72,7 +70,6 @@ export interface Filters {
   replies: boolean;
 }
 
-/** タイムライン 1 回分の取得結果。 */
 export interface TimelineResponse {
   items: Tweet[];
   cursor: string | null;
@@ -88,7 +85,7 @@ export interface TimelineResponse {
  */
 export type TweetAction = 'like' | 'retweet' | 'bookmark';
 
-/** 操作 1 回分の指定。on が真なら実行、偽なら取り消し。 */
+/** on が真なら実行、偽なら取り消し。 */
 export interface ActionRequest {
   /** ポストの id。リポストされたものは元ポストの id を指す。 */
   id: string;
@@ -99,9 +96,9 @@ export interface ActionRequest {
 /** 画面の表示設定。localStorage に保存する。 */
 export interface Options {
   /**
-   * masonry の列数。0 は「自動」で、画面幅から詰め込める本数を決める。
-   * 列「幅」ではなく列「数」を持つのは、同じ設定でも画面の広さで見え方が変わるのを避けるため。
-   * 幅を指定すると、広い画面では列が増えて 1 枚が小さいまま、狭い画面では 1 列に潰れる。
+   * 0 は「自動」で、画面幅から詰め込める本数を決める。
+   * 幅ではなく数を持つのは、幅で指定すると広い画面では列が増えて 1 枚が小さいまま、
+   * 狭い画面では 1 列に潰れるため。
    */
   columns: number;
   photos: boolean;
@@ -112,8 +109,7 @@ export interface Options {
   blur: boolean;
   split: boolean;
   /**
-   * 拾った投稿を壁から外すまでの秒数。0 は切。
-   * 入り切りと長さを 1 つの数で持つのは、切っているあいだ秒数だけが宙に浮くのを避けるため。
+   * 拾った投稿を壁から外すまでの秒数。0 は切（入り切りと長さを 1 つの数で持つ）。
    * 掛かるのはおすすめとフォロー中だけで、自分で並びを決めて開いた画面には掛からない。
    */
   sweep: number;
