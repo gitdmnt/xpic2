@@ -20,6 +20,7 @@ import { Lightbox } from './components/Lightbox.tsx';
 import type { LightboxEntry } from './components/Lightbox.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import type { SettingsTab } from './components/SettingsModal.tsx';
+import { ShortcutModal } from './components/ShortcutModal.tsx';
 
 const SOURCE_KEY = 'xpic2:source';
 const QUERY_KEY = 'xpic2:query';
@@ -104,6 +105,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('display');
   const [lbIndex, setLbIndex] = useState(-1);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [undoTweet, setUndoTweet] = useState<Tweet | null>(null);
 
   // どのタブを開くかは呼ぶ側が決める。自分で開いた人が見たいのは表示設定で、こちらが勝手に
   // 開くのは接続が整っていないときだけなので、開く理由ごとに行き先が違う。
@@ -111,6 +114,7 @@ export function App() {
     setSettingsTab(tab);
     setSettingsOpen(true);
   }, []);
+  const closeShortcuts = useCallback(() => setShortcutsOpen(false), []);
 
   const queryInputRef = useRef<HTMLInputElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -138,7 +142,7 @@ export function App() {
   const sweeping = opts.sweep && (request.source === 'foryou' || request.source === 'following');
   // 掃くのを止める合図には lbIndex を使う。丸めた lightboxIndex は tiles から導くので、
   // ここで見ると tiles → phase → tiles の輪になる。
-  const { hidden, hide, clear: clearHidden } = useHidden();
+  const { hidden, hide, unhide, clear: clearHidden } = useHidden();
   const { phase, removed, dismiss, collapse, forget } = useDismiss(tweets);
   const { armed } = useSweep(tweets, actions, sweeping && lbIndex < 0, phase);
 
@@ -147,9 +151,24 @@ export function App() {
     (tweet: Tweet) => {
       hide(tweet.id);
       dismiss(tweet.id);
+      setUndoTweet(tweet);
     },
     [hide, dismiss],
   );
+
+  const handleUndoHide = useCallback(() => {
+    if (!undoTweet) return;
+    const ids = new Set([undoTweet.id]);
+    unhide(undoTweet.id);
+    forget(ids);
+    setUndoTweet(null);
+  }, [undoTweet, unhide, forget]);
+
+  useEffect(() => {
+    if (!undoTweet) return;
+    const timer = setTimeout(() => setUndoTweet(null), 6000);
+    return () => clearTimeout(timer);
+  }, [undoTweet]);
 
   // 戻すときは記録と外した印の両方を落とす。記録だけ消しても、この画面を開き直すまで壁に返らない。
   const handleClearHidden = useCallback(() => {
@@ -263,19 +282,25 @@ export function App() {
   // ── キーボード ───────────────────────────────────────────────
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-      // モーダルやライトボックスの背後にある入力へフォーカスを飛ばさない。
-      if (settingsOpen || lightboxIndex >= 0) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const active = document.activeElement;
-      // 入力中の '/' はただの文字なので奪わない。
       if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
       if (active instanceof HTMLElement && active.isContentEditable) return;
+      if (e.key === '?' && !settingsOpen) {
+        e.preventDefault();
+        setShortcutsOpen((open) => !open);
+        return;
+      }
+      if (e.key !== '/') return;
+      // モーダルやライトボックスの背後にある入力へフォーカスを飛ばさない。
+      if (settingsOpen || shortcutsOpen || lightboxIndex >= 0) return;
+      // 入力中の '/' はただの文字なので奪わない。
       e.preventDefault();
       queryInputRef.current?.focus();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [settingsOpen, lightboxIndex]);
+  }, [settingsOpen, shortcutsOpen, lightboxIndex]);
 
   // ── 操作 ─────────────────────────────────────────────────────
   const handleSourceChange = useCallback((next: Source) => {
@@ -376,6 +401,7 @@ export function App() {
           armed={armed}
           onExit={dismiss}
           onCollapse={collapse}
+          keyboardActive={!settingsOpen && !shortcutsOpen && lightboxIndex < 0}
         />
         {/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */}
         <div ref={sentinelRef} className="h-px" />
@@ -391,18 +417,27 @@ export function App() {
         onNearEnd={loadMore}
         actions={actions}
         onAction={handleAction}
+        keyboardActive={!shortcutsOpen}
       />
 
       {/* 操作の失敗通知。ライトボックス (z-70) より前に出す。拡大表示中に押しても読めるようにするため。 */}
       {actionError ? (
         <div
-          className="fixed bottom-4 left-1/2 z-80 flex max-w-[min(680px,calc(100%_-_32px))] -translate-x-1/2 items-center gap-3 rounded-md border border-line bg-elev py-2 pr-2 pl-4 text-sm text-danger shadow-float"
+          className={`fixed left-1/2 z-80 flex max-w-[min(680px,calc(100%_-_32px))] -translate-x-1/2 items-center gap-3 rounded-md border border-line bg-elev py-2 pr-2 pl-4 text-sm text-danger shadow-float ${undoTweet ? 'bottom-16' : 'bottom-4'}`}
           role="status"
         >
           <span>{actionError}</span>
           <button type="button" className="btn btn-ghost btn-icon" aria-label="閉じる" onClick={dismissError}>
             <Icon name="close" />
           </button>
+        </div>
+      ) : null}
+
+      {undoTweet ? (
+        <div className="fixed bottom-4 left-1/2 z-80 flex max-w-[min(680px,calc(100%_-_32px))] -translate-x-1/2 items-center gap-3 rounded-md border border-line bg-elev py-2 pr-2 pl-4 text-sm shadow-float" role="status">
+          <span>投稿を消しました</span>
+          <button type="button" className="btn btn-ghost" onClick={handleUndoHide}>元に戻す</button>
+          <button type="button" className="btn btn-ghost btn-icon" aria-label="閉じる" onClick={() => setUndoTweet(null)}><Icon name="close" /></button>
         </div>
       ) : null}
 
@@ -417,6 +452,7 @@ export function App() {
         hiddenCount={hidden.size}
         onClearHidden={handleClearHidden}
       />
+      <ShortcutModal open={shortcutsOpen} onClose={closeShortcuts} />
     </>
   );
 }

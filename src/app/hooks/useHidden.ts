@@ -26,6 +26,8 @@ export interface HiddenState {
   /** 非表示にしたポスト id。 */
   hidden: ReadonlySet<string>;
   hide(id: string): void;
+  /** 1 件だけ記録から外す。直前の非表示を戻すために使う。 */
+  unhide(id: string): void;
   /** 記録を全部忘れる。押し間違いの受け皿。 */
   clear(): void;
 }
@@ -49,5 +51,10 @@ export function useHidden(): HiddenState {
 
   const clear = useCallback(() => setIds([]), [setIds]);
 
-  return { hidden, hide, clear };
+  const unhide = useCallback(
+    (id: string) => setIds((prev) => clean(prev).filter((v) => v !== id)),
+    [setIds],
+  );
+
+  return { hidden, hide, unhide, clear };
 }

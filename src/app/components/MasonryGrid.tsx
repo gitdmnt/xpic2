@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Media, Options, Tweet, TweetAction } from '../../shared/types';
 import { useElementWidth, useMasonry } from '../hooks/useMasonry';
 import type { TweetActionState } from '../hooks/useTweetActions';
@@ -34,6 +34,8 @@ interface MasonryGridProps {
   onExit(id: string): void;
   /** 穴を畳んでよい合図。上へ戻り始めたときに返す。 */
   onCollapse(): void;
+  /** モーダルやライトボックスが開いていないときだけ壁のキー操作を受ける。 */
+  keyboardActive: boolean;
 }
 
 /** タイルの座標は JS で計算するので、CSS ではなくここが余白の唯一の出どころ。 */
@@ -58,8 +60,39 @@ function aspectOf(media: Media): number {
   return Math.min(3, Math.max(0.42, w / h));
 }
 
+type Direction = 'left' | 'right' | 'up' | 'down';
+
+/** 指定方向にあるタイルから、進行方向と横ずれの合計が最小のものを選ぶ。 */
+export function findNeighbor(
+  placements: readonly { x: number; y: number; width: number; height: number }[],
+  current: number,
+  direction: Direction,
+  available: ReadonlySet<number>,
+): number {
+  const from = placements[current];
+  if (!from) return current;
+  const fx = from.x + from.width / 2;
+  const fy = from.y + from.height / 2;
+  let best = current;
+  let bestScore = Infinity;
+  placements.forEach((p, i) => {
+    if (i === current || !available.has(i)) return;
+    const dx = p.x + p.width / 2 - fx;
+    const dy = p.y + p.height / 2 - fy;
+    const primary = direction === 'left' ? -dx : direction === 'right' ? dx : direction === 'up' ? -dy : dy;
+    if (primary <= 0) return;
+    const cross = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx);
+    const score = primary + cross * 2;
+    if (score < bestScore) {
+      best = i;
+      bestScore = score;
+    }
+  });
+  return best;
+}
+
 export function MasonryGrid(props: MasonryGridProps) {
-  const { tiles, opts, onOpen, actions, onAction, onHide, armed, onExit, onCollapse } = props;
+  const { tiles, opts, onOpen, actions, onAction, onHide, armed, onExit, onCollapse, keyboardActive } = props;
   const gridRef = useRef<HTMLDivElement>(null);
   const containerWidth = useElementWidth(gridRef);
 
@@ -81,6 +114,89 @@ export function MasonryGrid(props: MasonryGridProps) {
    * 打ち消しが噛み合わず壁ごと流れて見える。
    */
   const [still, setStill] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  const available = useMemo(() => {
+    const out = new Set<number>();
+    tiles.forEach((t, i) => {
+      if (!t.hole && !t.leaving && placements[i]) out.add(i);
+    });
+    return out;
+  }, [tiles, placements]);
+
+  const selectedIndex = selectedKey === null ? -1 : tiles.findIndex((t) => t.key === selectedKey);
+
+  /** 未選択なら、今の画面中央に最も近いタイルから始める。 */
+  const initialIndex = useCallback(() => {
+    const wall = gridRef.current?.getBoundingClientRect().top ?? 0;
+    const target = window.innerHeight / 2;
+    let best = -1;
+    let distance = Infinity;
+    for (const i of available) {
+      const p = placements[i];
+      if (!p) continue;
+      const d = Math.abs(wall + p.y + p.height / 2 - target);
+      if (d < distance) {
+        best = i;
+        distance = d;
+      }
+    }
+    return best;
+  }, [available, placements]);
+
+  useEffect(() => {
+    if (selectedKey !== null && selectedIndex < 0) setSelectedKey(null);
+  }, [selectedKey, selectedIndex]);
+
+  // 選んだタイルへフォーカスを移し、画面の外なら必要な分だけスクロールする。
+  useEffect(() => {
+    if (selectedKey === null) return;
+    const elements = gridRef.current?.querySelectorAll<HTMLElement>('[data-tile-key]');
+    const el = elements ? [...elements].find((item) => item.dataset.tileKey === selectedKey) : undefined;
+    el?.focus({ preventScroll: true });
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selectedKey]);
+
+  useEffect(() => {
+    if (!keyboardActive) return;
+    const directions: Record<string, Direction> = {
+      ArrowLeft: 'left', ArrowDown: 'down', ArrowUp: 'up', ArrowRight: 'right',
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+      if (active instanceof HTMLElement && active.isContentEditable) return;
+      // ヘッダやタイル内のボタンをキーボードで押すときは、その要素自身の操作を優先する。
+      if (active instanceof HTMLButtonElement || active instanceof HTMLAnchorElement) return;
+      const direction = directions[e.key];
+      let current = selectedIndex >= 0 && available.has(selectedIndex) ? selectedIndex : initialIndex();
+      if (direction) {
+        if (current < 0) return;
+        const next = selectedIndex < 0 ? current : findNeighbor(placements, current, direction, available);
+        setSelectedKey(tiles[next]?.key ?? null);
+      } else if (e.key === 'Enter' && current >= 0) {
+        onOpen(tiles[current]?.lbIndex ?? 0);
+      } else if ((e.key === 'l' || e.key === 'b') && current >= 0) {
+        if (e.repeat) {
+          e.preventDefault();
+          return;
+        }
+        if (selectedIndex < 0) {
+          setSelectedKey(tiles[current]?.key ?? null);
+          e.preventDefault();
+          return;
+        }
+        const tweet = tiles[current]?.tweet;
+        if (tweet) onAction(tweet, e.key === 'l' ? 'like' : 'bookmark');
+      } else {
+        return;
+      }
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [keyboardActive, selectedIndex, available, initialIndex, placements, tiles, onOpen, onAction]);
 
   // スクロールを見る場所はここ 1 つ。掃く合図と、穴を畳む合図の両方をここで出す。
   //
@@ -205,6 +321,7 @@ export function MasonryGrid(props: MasonryGridProps) {
           return (
             <Tile
               key={t.key}
+              tileKey={t.key}
               tweet={t.tweet}
               media={t.media}
               groupCount={t.group.length}

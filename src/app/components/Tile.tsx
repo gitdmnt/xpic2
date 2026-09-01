@@ -13,6 +13,7 @@ import { Icon, type IconName } from './Icon';
 export const META_HEIGHT = 34;
 
 interface TileProps {
+  tileKey: string;
   tweet: Tweet;
   media: Media;
   groupCount: number;
@@ -66,6 +67,7 @@ const TILE =
   ' motion-reduce:animate-none motion-reduce:transition-none';
 
 export const Tile = memo(function Tile({
+  tileKey,
   tweet,
   media,
   groupCount,
@@ -124,6 +126,8 @@ export const Tile = memo(function Tile({
   return (
     <article
       ref={rootRef}
+      data-tile-key={tileKey}
+      tabIndex={-1}
       className={leaving ? `${TILE} opacity-0` : TILE}
       // 外れていく途中は触れない。薄いだけのタイルを押して拡大表示が開くのを防ぐ。
       // pointer-events では読み上げと Tab の順序に残ってしまうので inert で丸ごと外す

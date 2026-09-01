@@ -26,6 +26,8 @@ export interface LightboxProps {
   /** ポスト id → いいね等の状態。 */
   actions: Map<string, TweetActionState>;
   onAction(tweet: Tweet, action: TweetAction): void;
+  /** 手前に別のモーダルがある間は、背後でキー操作を受けない。 */
+  keyboardActive?: boolean;
 }
 
 /** 残りがこの件数を切ったら追加読み込みを促す。 */
@@ -87,7 +89,7 @@ const STAGE_MEDIA = 'max-h-full max-w-full rounded-sm object-contain';
  */
 const LB_LINK = 'inline-flex items-center -my-2 p-2 text-lb-dim hover:text-lb-fg hover:underline';
 
-export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actions, onAction }: LightboxProps) {
+export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actions, onAction, keyboardActive = true }: LightboxProps) {
   const entry = index >= 0 ? list[index] : undefined;
   const visible = entry !== undefined;
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -126,7 +128,7 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
   // 早期 return より前なので、ショートカットの対象は entry から直に取る。
   const activeTweet = entry?.tweet;
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !keyboardActive) return;
     const onKeyDown = (e: KeyboardEvent) => {
       // Cmd+L のようなブラウザ側の割り当ては奪わない。
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -138,14 +140,17 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight' || e.key === 'j') move(1);
       else if (e.key === 'ArrowLeft' || e.key === 'k') move(-1);
-      else if (action && activeTweet) onAction(activeTweet, action);
+      else if (action && activeTweet) {
+        // 長押し中に API の返事が戻ると再び反転できてしまうため、操作キーのリピートは捨てる。
+        if (!e.repeat) onAction(activeTweet, action);
+      }
       else return;
       // 矢印キーでの背後スクロールを止める。
       e.preventDefault();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [visible, move, onClose, activeTweet, onAction]);
+  }, [visible, keyboardActive, move, onClose, activeTweet, onAction]);
 
   // onNearEnd の同一性が変わるたびに再発火させたくないので、呼び出しは ref 経由にする。
   const nearEndRef = useRef(onNearEnd);
