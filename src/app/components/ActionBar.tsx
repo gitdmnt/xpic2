@@ -17,6 +17,11 @@ interface ActionBarProps {
   onAction(tweet: Tweet, action: TweetAction): void;
 }
 
+/** 壁に並ぶバー。拡大表示のバーには非表示を置かない（見ている最中に並びが詰まるため）。 */
+interface WallActionBarProps extends ActionBarProps {
+  onHide(tweet: Tweet): void;
+}
+
 const BUTTON =
   "inline-flex cursor-pointer items-center justify-center gap-1 rounded-sm border border-transparent leading-none transition-colors disabled:cursor-progress disabled:opacity-45";
 
@@ -141,7 +146,35 @@ function ShareButton({ url, className }: { url: string; className: string }) {
   );
 }
 
-export function OverlayActionBar({ tweet, state, onAction }: ActionBarProps) {
+const HIDE_LABEL = "この投稿を消す";
+
+/** 押したら消える操作で、押した状態が残らない。トグルではないので aria-pressed は付けない。 */
+function HideButton({
+  onHide,
+  className,
+}: {
+  onHide(): void;
+  className: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${BUTTON} ${className}`}
+      title={HIDE_LABEL}
+      aria-label={HIDE_LABEL}
+      onClick={onHide}
+    >
+      <Icon name="hide" />
+    </button>
+  );
+}
+
+export function OverlayActionBar({
+  tweet,
+  state,
+  onAction,
+  onHide,
+}: WallActionBarProps) {
   const viewer = state?.viewer ?? tweet.viewer;
   // 1 つでも on なら、ホバーしていなくても見せる。
   const active = viewer.liked || viewer.retweeted || viewer.bookmarked;
@@ -167,11 +200,20 @@ export function OverlayActionBar({ tweet, state, onAction }: ActionBarProps) {
         url={tweet.url}
         className="px-0.5 py-1 text-fg-dim hover:bg-shade hover:text-fg"
       />
+      <HideButton
+        onHide={() => onHide(tweet)}
+        className="px-0.5 py-1 text-fg-dim hover:bg-shade hover:text-fg"
+      />
     </div>
   );
 }
 
-export function MetaActionBar({ tweet, state, onAction }: ActionBarProps) {
+export function MetaActionBar({
+  tweet,
+  state,
+  onAction,
+  onHide,
+}: WallActionBarProps) {
   return (
     <div
       className="ml-auto flex shrink-0 items-center gap-2"
@@ -191,6 +233,10 @@ export function MetaActionBar({ tweet, state, onAction }: ActionBarProps) {
       ))}
       <ShareButton
         url={tweet.url}
+        className="px-0.5 py-1 text-fg-faint hover:bg-shade hover:text-fg"
+      />
+      <HideButton
+        onHide={() => onHide(tweet)}
         className="px-0.5 py-1 text-fg-faint hover:bg-shade hover:text-fg"
       />
     </div>

@@ -56,11 +56,9 @@
   --color-accent:        #44566a;
   --color-accent-strong: #2e3d4c;
   --color-accent-fg:     #fbf9f3;  /* 藍鼠の上に乗る字 */
-  /* 選択中の印。weak (.10) は生成り地に対して 1.16:1 で、ホバーの bg-shade (1.18:1) より薄い。
-     字が残っているセグメントはこれで足りるが、アイコンだけのタブは
-     「触っているタブ」のほうが「選んでいるタブ」より濃く見えてしまう。
-     タブには 1 段濃い mark (1.30:1) を敷く。罫は足さない（囲みを増やさない方針）。 */
-  --color-accent-weak:   rgba(68, 86, 106, .10);
+  /* 選択中の印。生成り地に対して 1.30:1 で、ホバーの bg-shade (1.18:1) より濃い。
+     これを下回ると、アイコンだけのタブでは「触っているタブ」のほうが
+     「選んでいるタブ」より濃く見えてしまう。罫は足さない（囲みを増やさない方針）。 */
   --color-accent-mark:   rgba(68, 86, 106, .18);
 
   /* 状態色 ── 彩度を抑えた和の色 */
@@ -165,6 +163,4 @@
 
   /* 選んでいる状態。ホバーで色が動かないよう、:hover にも同じ塗りを置く。 */
   .btn-on, .btn-on:hover { @apply border-transparent bg-accent-mark text-accent-strong; }
-  /* 字が残っている列数セグメント向け。選択は字色が先に伝えるので、塗りは念押しでよい。 */
-  .btn-on-weak, .btn-on-weak:hover { @apply border-transparent bg-accent-weak text-accent-strong; }
 }

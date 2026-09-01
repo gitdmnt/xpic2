@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Media, Options, Tweet, TweetAction } from '../../shared/types';
 import { useElementWidth, useMasonry } from '../hooks/useMasonry';
 import type { TweetActionState } from '../hooks/useTweetActions';
@@ -11,8 +11,10 @@ export interface TileItem {
   media: Media;
   group: Media[];
   lbIndex: number;
-  /** 外れていく途中。薄くしながら場所を保ち、消えきってから tiles から外れる。 */
+  /** 外れていく途中。薄くしながら場所を保ち、消えきってから gone になる。 */
   leaving: boolean;
+  /** 外れた跡。配置には数えるが描かない（詰めると壁が組み直されるため）。 */
+  hole: boolean;
 }
 
 interface MasonryGridProps {
@@ -22,17 +24,32 @@ interface MasonryGridProps {
   /** ポスト id → いいね等の状態。同じ投稿のタイルは同じ値を引く。 */
   actions: Map<string, TweetActionState>;
   onAction(tweet: Tweet, action: TweetAction): void;
+  onHide(tweet: Tweet): void;
   /**
    * 画面の外へ出たら外すポスト id。tiles に混ぜず別に受け取るのは、拾うたびに tiles が
    * 作り直されると、壁の配置まで計算し直しになるため。
    */
   armed: ReadonlySet<string>;
-  /** そのポストのタイルが画面の外へ出た合図。 */
+  /** その投稿のタイルが全部画面の外へ出た合図。 */
   onExit(id: string): void;
+  /** 穴を畳んでよい合図。上へ戻り始めたときに返す。 */
+  onCollapse(): void;
 }
 
 /** タイルの座標は JS で計算するので、CSS ではなくここが余白の唯一の出どころ。 */
 const GAP = 12;
+
+/**
+ * 画面の外へ出たと見なすまでの余白。縁を跨いだだけで外すと、少し戻したときに消える途中が
+ * 見えるので、ひと呼吸ぶん外へ出てから外す。
+ */
+const SWEEP_MARGIN = 200;
+
+/**
+ * 穴を畳むまでに要る、上向きの移動量。跳ね返りや指の震えで詰まらない程度に取る。
+ * ホイールなら 3 目盛りほど、トラックパッドならひと振りに満たない。
+ */
+const COLLAPSE_PULL = 300;
 
 /** 極端な縦長・横長は列を壊すので範囲を丸める。 */
 function aspectOf(media: Media): number {
@@ -41,7 +58,8 @@ function aspectOf(media: Media): number {
   return Math.min(3, Math.max(0.42, w / h));
 }
 
-export function MasonryGrid({ tiles, opts, onOpen, actions, onAction, armed, onExit }: MasonryGridProps) {
+export function MasonryGrid(props: MasonryGridProps) {
+  const { tiles, opts, onOpen, actions, onAction, onHide, armed, onExit, onCollapse } = props;
   const gridRef = useRef<HTMLDivElement>(null);
   const containerWidth = useElementWidth(gridRef);
 
@@ -56,6 +74,109 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction, armed, onE
     footer: opts.meta ? META_HEIGHT : 0,
   });
 
+  /** 穴を畳む直前に控える錨。畳んだ後に同じタイルの位置を見て、その差をスクロール量へ返す。 */
+  const anchorRef = useRef<{ key: string; y: number } | null>(null);
+  /**
+   * 詰めた 1 回だけタイルの遷移を止める。スクロールは即座に戻るのに位置だけ 280ms かけて動くと、
+   * 打ち消しが噛み合わず壁ごと流れて見える。
+   */
+  const [still, setStill] = useState(false);
+
+  // スクロールを見る場所はここ 1 つ。掃く合図と、穴を畳む合図の両方をここで出す。
+  //
+  // 掃くのは投稿単位で、そのタイルが全部画面の外へ出てから（1 枚でも見えているうちに外すと、
+  // 見ている写真が消える）。タイルごとに IntersectionObserver を張らないのは、投稿の占める帯が
+  // placements からしか出せず、通知の遅れも挟まりたくないため。
+  //
+  // 畳むのは上へ戻り始めたとき。下へ読み進めている最中に詰めると、見ている場所より上が縮んで
+  // 並びが動く。上へ向かっているあいだなら、動く先（下）は既に見た側になる。
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+
+    // 投稿 id → そのタイル全部を覆う帯（壁の中の座標）。
+    const spans = new Map<string, { top: number; bottom: number }>();
+    let holes = false;
+    tiles.forEach((t, i) => {
+      if (t.hole) holes = true;
+      const p = placements[i];
+      if (!p || !armed.has(t.tweet.id)) return;
+      const span = spans.get(t.tweet.id);
+      if (!span) {
+        spans.set(t.tweet.id, { top: p.y, bottom: p.y + p.height });
+        return;
+      }
+      span.top = Math.min(span.top, p.y);
+      span.bottom = Math.max(span.bottom, p.y + p.height);
+    });
+    if (spans.size === 0 && !holes) return;
+
+    let frame = 0;
+    let last = window.scrollY;
+    let pull = 0;
+
+    /** 画面の上端にいちばん近いタイル。並び順はおおよそ上から下なので、先頭から見つけて足りる。 */
+    const anchor = (wall: number) => {
+      for (const [i, t] of tiles.entries()) {
+        const p = placements[i];
+        if (!p || t.hole) continue;
+        if (wall + p.y + p.height > 0) return { key: t.key, y: p.y };
+      }
+      return null;
+    };
+
+    const check = () => {
+      frame = 0;
+      // 壁の上端だけ測れば、あとは配置の値で足りる。読むのは 1 フレームに 1 回。
+      const wall = el.getBoundingClientRect().top;
+      const view = window.innerHeight;
+
+      for (const [id, span] of spans) {
+        if (wall + span.bottom > -SWEEP_MARGIN && wall + span.top < view + SWEEP_MARGIN) continue;
+        // 張り直しまでのあいだ何度も返さないよう、返した投稿は帯ごと落とす。
+        spans.delete(id);
+        onExit(id);
+      }
+
+      if (!holes) return;
+      const y = window.scrollY;
+      const back = last - y;
+      last = y;
+      // 下向きが挟まったら数え直す。往復ではなく、上へ向かい続けたぶんだけを見る。
+      pull = back > 0 ? pull + back : 0;
+      if (pull < COLLAPSE_PULL) return;
+      pull = 0;
+      anchorRef.current = anchor(wall);
+      setStill(true);
+      onCollapse();
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+
+    // 拾った時点で既に外にある投稿（拡大表示の中で拾って閉じた場合）は、ここで外れる。
+    check();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [armed, tiles, placements, onExit, onCollapse]);
+
+  // 畳んだぶんスクロール量を戻す。描く前に済ませないと、詰まった壁が一度描かれてから跳ねる。
+  // 遷移を戻すのもここ。同じ位置のまま戻すので、動きは起きない。
+  useLayoutEffect(() => {
+    const held = anchorRef.current;
+    if (!held) return;
+    anchorRef.current = null;
+    const i = tiles.findIndex((t) => t.key === held.key);
+    const p = i < 0 ? undefined : placements[i];
+    if (p && p.y !== held.y) window.scrollBy(0, p.y - held.y);
+    setStill(false);
+  }, [tiles, placements, still]);
+
   // onOpen は親のレンダー毎に別関数になりうる。Tile の memo を無効化しないよう、
   // 各タイルへ渡すハンドラは tiles 単位で固定し、呼び出し先だけ ref で最新に保つ。
   const onOpenRef = useRef(onOpen);
@@ -68,13 +189,19 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction, armed, onE
   );
 
   return (
-    <div className="relative w-full" ref={gridRef} style={{ height: `${height}px` }}>
+    // 遷移を止めるのは器の側から。タイルの class より詳細度が高いので、確実にこちらが勝つ。
+    <div
+      className={still ? 'relative w-full [&_article]:transition-none' : 'relative w-full'}
+      ref={gridRef}
+      style={{ height: `${height}px` }}
+    >
       {/* 幅が測れるまでは配置が全て原点に潰れるので描かない。 */}
       {containerWidth > 0 &&
         tiles.map((t, i) => {
           const placement = placements[i];
           const handler = openHandlers[i];
-          if (!placement || !handler) return null;
+          // 穴は場所だけ取って何も描かない。aspects には残っているので下の配置は動かない。
+          if (t.hole || !placement || !handler) return null;
           return (
             <Tile
               key={t.key}
@@ -85,11 +212,10 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction, armed, onE
               showMeta={opts.meta}
               blurred={opts.blur && t.tweet.sensitive}
               leaving={t.leaving}
-              armed={armed.has(t.tweet.id)}
-              onExit={onExit}
               onOpen={handler}
               action={actions.get(t.tweet.id)}
               onAction={onAction}
+              onHide={onHide}
             />
           );
         })}

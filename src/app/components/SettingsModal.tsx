@@ -30,6 +30,9 @@ export interface SettingsModalProps {
    */
   tab: SettingsTab;
   onTabChange(tab: SettingsTab): void;
+  /** 押して消した投稿の件数。0 なら戻す的も要らない。 */
+  hiddenCount: number;
+  onClearHidden(): void;
 }
 
 interface Message {
@@ -37,8 +40,20 @@ interface Message {
   bad: boolean;
 }
 
-/** 列数の選択肢。0 は「自動」で、画面の幅から決める。 */
+/** 列数の目盛り。0 は「自動」で、画面の幅から決める。 */
 const COLUMNS: readonly number[] = [0, 2, 3, 4, 5, 6, 7, 8];
+
+/**
+ * つまみの位置。1 列を持たず「自動」から始まる並びなので、列数そのものではなく COLUMNS の添字で持つ。
+ * 表に無い値（保存し直す前の古い設定）は左端へ寄せる。
+ */
+function columnStep(columns: number): number {
+  return Math.max(0, COLUMNS.indexOf(columns));
+}
+
+function columnLabel(columns: number): string {
+  return columns === 0 ? "自動" : String(columns);
+}
 
 /** Tab で辿れる要素。details が閉じているときの中身まで拾うので、見えているものへ後で絞る。 */
 const FOCUSABLE =
@@ -128,6 +143,8 @@ export function SettingsModal({
   onOptsChange,
   tab,
   onTabChange,
+  hiddenCount,
+  onClearHidden,
 }: SettingsModalProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   /** 開く直前にフォーカスがあった要素。閉じたらここへ返す。 */
@@ -318,22 +335,35 @@ export function SettingsModal({
               <h3 className={OPT_TITLE} id="opt-columns">
                 カラム数
               </h3>
-              <div
-                className="flex flex-wrap gap-1"
-                role="group"
-                aria-labelledby="opt-columns"
-              >
-                {COLUMNS.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`btn min-w-11 text-sm tabular-nums${opts.columns === n ? " btn-on-weak" : ""}`}
-                    aria-pressed={opts.columns === n}
-                    onClick={() => onOptsChange({ columns: n })}
-                  >
-                    {n === 0 ? "自動" : n}
-                  </button>
-                ))}
+              <div className="flex items-center gap-3">
+                {/* 色は accent-color に任せる（チェックボックスと同じ出どころ）。つまみと左側の
+                    塗りが藍鼠になり、右側の軌道だけがブラウザ既定の灰で残る。ここを塗り替えるには
+                    疑似要素で軌道ごと引き受けることになり、左側の塗りまで自前で描く羽目になる。 */}
+                <input
+                  type="range"
+                  className="h-8 w-full max-w-80 cursor-pointer accent-accent"
+                  min={0}
+                  max={COLUMNS.length - 1}
+                  step={1}
+                  value={columnStep(opts.columns)}
+                  aria-labelledby="opt-columns"
+                  // 読み上げには添字ではなく選んでいる列数を渡す。
+                  aria-valuetext={columnLabel(opts.columns)}
+                  onChange={(e) =>
+                    onOptsChange({
+                      columns: COLUMNS[Number(e.currentTarget.value)] ?? 0,
+                    })
+                  }
+                />
+                {/* 数字はスライダーだけでは読めないので隣に出す。幅を固めるのは「自動」と 1 桁で
+                    字幅が変わり、つまみの右端が動いて見えるのを防ぐため。
+                    読み上げは上の aria-valuetext が持っているので、こちらは目にだけ残す。 */}
+                <span
+                  className="w-8 shrink-0 text-sm tabular-nums"
+                  aria-hidden="true"
+                >
+                  {columnLabel(opts.columns)}
+                </span>
               </div>
             </div>
 
@@ -399,6 +429,25 @@ export function SettingsModal({
                   checked={opts.sweep}
                   onToggle={(v) => onOptsChange({ sweep: v })}
                 />
+              </div>
+            </div>
+
+            <div>
+              <h3 className={OPT_TITLE} id="opt-hidden">
+                消した投稿
+              </h3>
+              {/* 件数を的の中に出す。記録があること自体が、ここを見るまで判らないため。
+                  戻せるのは全部まとめてだけ。1 件ずつ選ばせるには、消したものを並べる面が要る。 */}
+              <div className={ROW}>
+                <button
+                  type="button"
+                  className="btn"
+                  aria-describedby="opt-hidden"
+                  disabled={hiddenCount === 0}
+                  onClick={onClearHidden}
+                >
+                  記録を消して戻す（{hiddenCount} 件）
+                </button>
               </div>
             </div>
           </div>

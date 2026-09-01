@@ -20,6 +20,7 @@ export type IconName =
   | 'expand'
   | 'views'
   | 'hidden'
+  | 'hide'
   | 'play'
   | 'gif'
   | 'share'
@@ -46,6 +47,9 @@ const GLYPH: Record<IconName, string> = {
   views: 'fi-rr-eye',
   // センシティブの印。views の目に斜線を引いた字なので、隣に置いて対だと分かるようにする。
   hidden: 'fi-rr-eye-crossed',
+  // 非表示にする操作。斜線の目は上のセンシティブの印が使っているので、同じ字を 2 つの意味に
+  // 充てないよう禁止の輪を当てる（ぼかしの上の印と操作ボタンが同じ形になってしまう）。
+  hide: 'fi-rr-ban',
   play: 'fi-rr-play',
   gif: 'fi-rr-gif',
   share: 'fi-rr-share',

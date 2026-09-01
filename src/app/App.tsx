@@ -2,14 +2,16 @@
 // 子コンポーネントは受け取った値を描くだけにする。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Media, Options, Source } from '../shared/types.ts';
+import type { Media, Options, Source, Tweet } from '../shared/types.ts';
 import { DEFAULT_OPTIONS } from '../shared/types.ts';
 import type { ExtStatus } from './lib/x.ts';
 import { extStatus, isReady } from './lib/x.ts';
 import { usePersistedState } from './hooks/usePersistedState.ts';
 import { useTimeline } from './hooks/useTimeline.ts';
 import { useTweetActions } from './hooks/useTweetActions.ts';
-import { useAutoDismiss } from './hooks/useAutoDismiss.ts';
+import { useDismiss } from './hooks/useDismiss.ts';
+import { useSweep } from './hooks/useSweep.ts';
+import { useHidden } from './hooks/useHidden.ts';
 import { Icon } from './components/Icon.tsx';
 import { TopBar } from './components/TopBar.tsx';
 import { MasonryGrid } from './components/MasonryGrid.tsx';
@@ -131,15 +133,29 @@ export function App() {
   } = useTweetActions(tweets);
 
   // 掃うのはおすすめとフォロー中だけ。自分で並びを決めて開いた画面では、
-  // 見えているものが勝手に減るほうが困る。
+  // 見えているものが勝手に減るほうが困る。押して消すほうは自分で選んだものなので、
+  // 取得元を問わず効かせる。
   const sweeping = opts.sweep && (request.source === 'foryou' || request.source === 'following');
   // 掃くのを止める合図には lbIndex を使う。丸めた lightboxIndex は tiles から導くので、
-  // ここで見ると tiles → dismissed → tiles の輪になる。
-  const {
-    armed,
-    phase: dismissed,
-    dismiss,
-  } = useAutoDismiss(tweets, actions, sweeping && lbIndex < 0);
+  // ここで見ると tiles → phase → tiles の輪になる。
+  const { hidden, hide, clear: clearHidden } = useHidden();
+  const { phase, removed, dismiss, collapse, forget } = useDismiss(tweets);
+  const { armed } = useSweep(tweets, actions, sweeping && lbIndex < 0, phase);
+
+  // 2 つの合図が同じ dismiss へ合流する。記録は永続、外し方は掃くのと同じ。
+  const handleHide = useCallback(
+    (tweet: Tweet) => {
+      hide(tweet.id);
+      dismiss(tweet.id);
+    },
+    [hide, dismiss],
+  );
+
+  // 戻すときは記録と外した印の両方を落とす。記録だけ消しても、この画面を開き直すまで壁に返らない。
+  const handleClearHidden = useCallback(() => {
+    forget(hidden);
+    clearHidden();
+  }, [forget, hidden, clearHidden]);
 
   // ── タイルとライトボックスの導出 ─────────────────────────────
   // split が真なら 1 メディア 1 タイル、偽なら 1 投稿 1 タイル（group は投稿の全メディア）。
@@ -149,22 +165,36 @@ export function App() {
     const out: TileItem[] = [];
     let lb = 0;
     for (const tweet of tweets) {
-      const phase = sweeping ? dismissed.get(tweet.id) : undefined;
-      if (phase === 'gone') continue;
+      const p = phase.get(tweet.id);
+      if (p === 'closed') continue;
+      // 今の壁で外している最中でなければ、外し済みの投稿は初めから出さない。
+      // 外している最中は場所を空けたまま残し、畳むか壁を作り直すかで初めてこの門に掛かる。
+      if (!p && (removed.has(tweet.id) || hidden.has(tweet.id))) continue;
+      const hole = p === 'hole';
       const groups: Media[][] = opts.split ? tweet.media.map((m) => [m]) : [tweet.media];
       for (const group of groups) {
         const media = group[0];
         if (!media) continue;
-        out.push({ key: `${tweet.id}:${media.key}`, tweet, media, group, lbIndex: lb, leaving: phase === 'leaving' });
-        lb += group.length;
+        out.push({
+          key: `${tweet.id}:${media.key}`,
+          tweet,
+          media,
+          group,
+          lbIndex: lb,
+          leaving: p === 'leaving',
+          hole,
+        });
+        // 穴は拡大表示に並ばないので、位置も取らない。
+        if (!hole) lb += group.length;
       }
     }
     return out;
-  }, [tweets, opts.split, sweeping, dismissed]);
+  }, [tweets, opts.split, phase, removed, hidden]);
 
   const entries = useMemo<LightboxEntry[]>(() => {
     const out: LightboxEntry[] = [];
     for (const tile of tiles) {
+      if (tile.hole) continue;
       for (const media of tile.group) out.push({ tweet: tile.tweet, media });
     }
     return out;
@@ -342,8 +372,10 @@ export function App() {
           onOpen={setLbIndex}
           actions={actions}
           onAction={handleAction}
+          onHide={handleHide}
           armed={armed}
           onExit={dismiss}
+          onCollapse={collapse}
         />
         {/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */}
         <div ref={sentinelRef} className="h-px" />
@@ -382,6 +414,8 @@ export function App() {
         onOptsChange={patchOpts}
         tab={settingsTab}
         onTabChange={setSettingsTab}
+        hiddenCount={hidden.size}
+        onClearHidden={handleClearHidden}
       />
     </>
   );
