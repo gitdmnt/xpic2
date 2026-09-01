@@ -16,10 +16,10 @@ const ROOT = path.join(import.meta.dir, '..', '..');
 const FILE = path.join(ROOT, 'config.json');
 
 /** x.com のウェブクライアントが使う公開 bearer トークン(固定値)。 */
-export const DEFAULT_BEARER =
+const DEFAULT_BEARER =
   'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
-export const DEFAULT_UA =
+const DEFAULT_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 // queryId / features の既定値の表はここには置かない。
@@ -44,7 +44,7 @@ export interface AppConfig {
 }
 
 /** config.json に実際に書かれている内容。未指定の項目は書かないので全て省略可能。 */
-export type StoredConfig = Partial<AppConfig>;
+type StoredConfig = Partial<AppConfig>;
 
 /** saveConfig / parseCurl が受け渡す差分。 */
 export type ConfigPatch = Partial<AppConfig>;

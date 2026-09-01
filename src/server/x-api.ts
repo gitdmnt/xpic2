@@ -45,7 +45,7 @@ const PAGE = 40;
 // screenName → restId。同じ画面で何度もページを送るので、1 プロセス内では引き直さない。
 const userIdCache = new Map<string, string>();
 
-export async function resolveUserId(screenName: string): Promise<string> {
+async function resolveUserId(screenName: string): Promise<string> {
   const key = screenName.toLowerCase().replace(/^@/, '').trim();
   if (!key) throw new ApiError(400, 'ユーザー名を指定してください。');
 

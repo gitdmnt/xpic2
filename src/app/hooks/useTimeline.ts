@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Options, Source, Tweet } from '../../shared/types.ts';
 import { ApiClientError, fetchTimeline } from '../lib/api.ts';
 
-export interface TimelineError {
+interface TimelineError {
   message: string;
   hint: string | null;
   status: number;

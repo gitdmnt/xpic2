@@ -6,6 +6,7 @@ import { basename } from 'node:path';
 import index from './src/app/index.html';
 import { configStatus, loadConfig, parseCurl, saveConfig } from './src/server/config.ts';
 import { ApiError, fetchMediaTimeline } from './src/server/x-api.ts';
+import { resetClient } from './src/server/x-client.ts';
 import { actOnTweet } from './src/server/x-post.ts';
 import type {
   ActionRequest,
@@ -96,6 +97,10 @@ const configPost = guarded(async (req) => {
   if (!Object.keys(patch).length) return fail(400, '保存する内容がありません。');
 
   saveConfig(patch);
+  // config.ts は循環 import を避けるため自分では呼べない。保存の呼び出し元がここで受け持つ。
+  // cookie と上書き指定は x-client 側のキャッシュ鍵に入っているので放っておいても作り直されるが、
+  // User-Agent はクライアント生成時にしか読まれないため、明示的に捨てないと古いまま残る。
+  resetClient();
   return json(200, { ok: true, note, status: configStatus() } satisfies ConfigSaveResponse);
 });
 

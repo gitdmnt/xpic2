@@ -188,5 +188,3 @@ export function Lightbox({ list, index, onIndexChange, onClose, onNearEnd, actio
     </div>
   );
 }
-
-export default Lightbox;

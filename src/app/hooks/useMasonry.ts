@@ -35,7 +35,7 @@ function columnCount(containerWidth: number, colWidth: number, gap: number): num
   return Math.max(1, Math.min(24, Math.floor((containerWidth + gap) / (colWidth + gap))));
 }
 
-export function computeMasonry(p: MasonryParams): MasonryResult {
+function computeMasonry(p: MasonryParams): MasonryResult {
   const { aspects, containerWidth, colWidth, gap, footer } = p;
   if (containerWidth <= 0 || aspects.length === 0) {
     return { placements: [], height: 0, columns: 0 };

@@ -16,6 +16,10 @@ export interface Media {
   durationMs?: number | null;
 }
 
+/**
+ * ポストの作者。いまは Tweet 経由でしか触らないが、共有する型の定義はこの 1 ファイルに揃える。
+ * @public
+ */
 export interface UserRef {
   name: string;
   screenName: string;
