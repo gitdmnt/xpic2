@@ -12,6 +12,12 @@ import { Icon, type IconName } from './Icon';
  */
 export const META_HEIGHT = 34;
 
+/**
+ * 画面の外へ出たと見なすまでの余白。縁を跨いだだけで外すと、少し戻したときに消える途中が
+ * 見えるので、ひと呼吸ぶん外へ出てから外す。
+ */
+const SWEEP_MARGIN = '200px';
+
 interface TileProps {
   tweet: Tweet;
   media: Media;
@@ -20,6 +26,12 @@ interface TileProps {
   showMeta: boolean;
   blurred: boolean;
   leaving: boolean;
+  /**
+   * 拾った印が付いていて、画面の外へ出たら外すもの。出たかどうかは位置を持つタイルにしか
+   * 判らないので、見張りはここが持ち、外す判断は onExit で呼び出し側へ返す。
+   */
+  armed: boolean;
+  onExit(id: string): void;
   onOpen(): void;
   /** いいね・リポスト・ブックマークの状態。ポスト単位なので同じ投稿のタイルは同じ値を受け取る。 */
   action: TweetActionState | undefined;
@@ -72,6 +84,8 @@ export const Tile = memo(function Tile({
   showMeta,
   blurred,
   leaving,
+  armed,
+  onExit,
   onOpen,
   action,
   onAction,
@@ -101,6 +115,22 @@ export const Tile = memo(function Tile({
     io.observe(el);
     return () => io.disconnect();
   }, [media.type, media.video]);
+
+  // 拾った投稿を掃く合図。画面の外へ出たら呼び出し側へ返す。armed のあいだだけ見張るので、
+  // 拾っていないタイルには監視が付かない。
+  useEffect(() => {
+    if (!armed) return;
+    const el = rootRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => !e.isIntersecting)) onExit(tweet.id);
+      },
+      { rootMargin: SWEEP_MARGIN },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [armed, onExit, tweet.id]);
 
   useEffect(() => {
     const v = videoRef.current;

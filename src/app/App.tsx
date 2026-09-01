@@ -132,10 +132,14 @@ export function App() {
 
   // 掃うのはおすすめとフォロー中だけ。自分で並びを決めて開いた画面では、
   // 見えているものが勝手に減るほうが困る。
-  const sweeping = opts.sweep > 0 && (request.source === 'foryou' || request.source === 'following');
-  // 待ち時間を止める合図には lbIndex を使う。丸めた lightboxIndex は tiles から導くので、
+  const sweeping = opts.sweep && (request.source === 'foryou' || request.source === 'following');
+  // 掃くのを止める合図には lbIndex を使う。丸めた lightboxIndex は tiles から導くので、
   // ここで見ると tiles → dismissed → tiles の輪になる。
-  const dismissed = useAutoDismiss(tweets, actions, sweeping && lbIndex < 0 ? opts.sweep * 1000 : 0);
+  const {
+    armed,
+    phase: dismissed,
+    dismiss,
+  } = useAutoDismiss(tweets, actions, sweeping && lbIndex < 0);
 
   // ── タイルとライトボックスの導出 ─────────────────────────────
   // split が真なら 1 メディア 1 タイル、偽なら 1 投稿 1 タイル（group は投稿の全メディア）。
@@ -332,7 +336,15 @@ export function App() {
       />
 
       <main className="p-4 max-sm:p-3">
-        <MasonryGrid tiles={tiles} opts={opts} onOpen={setLbIndex} actions={actions} onAction={handleAction} />
+        <MasonryGrid
+          tiles={tiles}
+          opts={opts}
+          onOpen={setLbIndex}
+          actions={actions}
+          onAction={handleAction}
+          armed={armed}
+          onExit={dismiss}
+        />
         {/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */}
         <div ref={sentinelRef} className="h-px" />
         {/* 上下を詰め、下だけ厚くする（頁の終いの余白をここが持つため）。 */}

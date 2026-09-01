@@ -40,29 +40,6 @@ interface Message {
 /** 列数の選択肢。0 は「自動」で、画面の幅から決める。 */
 const COLUMNS: readonly number[] = [0, 2, 3, 4, 5, 6, 7, 8];
 
-/**
- * 「拾ったら消す」のつまみ。1〜30 秒を刻み 1 で送り、その先の 1 目盛りを切に充てる。
- * 猶予が伸びていった先が「もう消さない」なので、切は左端ではなく右端に置く。
- * 保存する値は Options.sweep のまま（0 が切）で、つまみの位置との読み替えはここが持つ。
- */
-const SWEEP_MAX = 30;
-const SWEEP_OFF = SWEEP_MAX + 1;
-
-/** つまみの位置 → 保存する秒数。 */
-function toSweep(pos: number): number {
-  return pos >= SWEEP_OFF ? 0 : pos;
-}
-
-/** 保存する秒数 → つまみの位置。 */
-function toPos(sweep: number): number {
-  return sweep === 0 ? SWEEP_OFF : sweep;
-}
-
-/** 目盛りの読み。字にも読み上げにも同じものを出す。 */
-function sweepLabel(sweep: number): string {
-  return sweep === 0 ? "切" : `${sweep}秒`;
-}
-
 /** Tab で辿れる要素。details が閉じているときの中身まで拾うので、見えているものへ後で絞る。 */
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
@@ -416,36 +393,12 @@ export function SettingsModal({
                   checked={opts.split}
                   onToggle={(v) => onOptsChange({ split: v })}
                 />
-              </div>
-            </div>
-
-            <div>
-              <h3 className={OPT_TITLE} id="opt-sweep">
-                fav/bookmark を付けたツイートを非表示にするまでの秒数
-              </h3>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  className="h-8 max-w-80 flex-1 cursor-pointer accent-accent"
-                  min={1}
-                  max={SWEEP_OFF}
-                  step={1}
-                  value={toPos(opts.sweep)}
-                  aria-labelledby="opt-sweep"
-                  aria-describedby="opt-sweep-note"
-                  aria-valuetext={sweepLabel(opts.sweep)}
-                  onChange={(e) =>
-                    onOptsChange({
-                      sweep: toSweep(Number(e.currentTarget.value)),
-                    })
-                  }
+                <Check
+                  label="fav/bookmark したら画面外で消す"
+                  title="fav か bookmark を付けた投稿を、スクロールで画面の外へ出たときに壁から外す（おすすめとフォロー中のみ）"
+                  checked={opts.sweep}
+                  onToggle={(v) => onOptsChange({ sweep: v })}
                 />
-                <span
-                  className="w-10 shrink-0 text-sm text-fg-dim tabular-nums"
-                  aria-hidden="true"
-                >
-                  {sweepLabel(opts.sweep)}
-                </span>
               </div>
             </div>
           </div>

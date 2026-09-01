@@ -22,6 +22,13 @@ interface MasonryGridProps {
   /** ポスト id → いいね等の状態。同じ投稿のタイルは同じ値を引く。 */
   actions: Map<string, TweetActionState>;
   onAction(tweet: Tweet, action: TweetAction): void;
+  /**
+   * 画面の外へ出たら外すポスト id。tiles に混ぜず別に受け取るのは、拾うたびに tiles が
+   * 作り直されると、壁の配置まで計算し直しになるため。
+   */
+  armed: ReadonlySet<string>;
+  /** そのポストのタイルが画面の外へ出た合図。 */
+  onExit(id: string): void;
 }
 
 /** タイルの座標は JS で計算するので、CSS ではなくここが余白の唯一の出どころ。 */
@@ -34,7 +41,7 @@ function aspectOf(media: Media): number {
   return Math.min(3, Math.max(0.42, w / h));
 }
 
-export function MasonryGrid({ tiles, opts, onOpen, actions, onAction }: MasonryGridProps) {
+export function MasonryGrid({ tiles, opts, onOpen, actions, onAction, armed, onExit }: MasonryGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
   const containerWidth = useElementWidth(gridRef);
 
@@ -78,6 +85,8 @@ export function MasonryGrid({ tiles, opts, onOpen, actions, onAction }: MasonryG
               showMeta={opts.meta}
               blurred={opts.blur && t.tweet.sensitive}
               leaving={t.leaving}
+              armed={armed.has(t.tweet.id)}
+              onExit={onExit}
               onOpen={handler}
               action={actions.get(t.tweet.id)}
               onAction={onAction}
