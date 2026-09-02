@@ -1,6 +1,6 @@
 {
   "name": "xpic2",
-  "version": "2.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "X (Twitter) の内部 GraphQL API から画像付きポストだけを集めて masonry 表示するローカル Web アプリ",
   "type": "module",
@@ -8,6 +8,7 @@
   "scripts": {
     "build": "bun build.ts",
     "build:firefox": "bun build.ts --firefox",
+    "release": "bun release.ts",
     "watch": "bun build.ts --watch",
     "watch:firefox": "bun build.ts --watch --firefox",
     "test": "bun test",
