@@ -5,7 +5,7 @@
 // cURL 欄はその手当が届かないときの控え。
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Options } from "../../shared/types.ts";
+import type { Options, PullAction } from "../../shared/types.ts";
 import type { ExtStatus } from "../lib/x.ts";
 import {
   applyCurl,
@@ -54,6 +54,29 @@ function columnStep(columns: number): number {
 function columnLabel(columns: number): string {
   return columns === 0 ? "自動" : String(columns);
 }
+
+/** 上へ引き切ったときの動き。どちらか一方だけが起きる。 */
+const PULL_ACTIONS: ReadonlyArray<{
+  value: PullAction;
+  label: string;
+  title: string;
+}> = [
+  {
+    value: "collapse",
+    label: "穴を畳む",
+    title: "外した跡の穴を詰める。見ている位置は動かない",
+  },
+  {
+    value: "reload",
+    label: "読み直す",
+    title: "今の壁を捨てて先頭から取り直す（穴も壁ごと消える）",
+  },
+];
+
+/** 発火するまでの引きの量（px）の目盛り。100 px 刻み。 */
+const PULL_MIN = 300;
+const PULL_MAX = 2000;
+const PULL_STEP = 100;
 
 /** Tab で辿れる要素。details が閉じているときの中身まで拾うので、見えているものへ後で絞る。 */
 const FOCUSABLE =
@@ -430,6 +453,68 @@ export function SettingsModal({
                   onToggle={(v) => onOptsChange({ sweep: v })}
                 />
               </div>
+            </div>
+
+            <div>
+              <h3 className={OPT_TITLE} id="opt-pull">
+                上へ戻したときの動き
+              </h3>
+              {/* 排他なので checkbox ではなく radio。name で束ねると矢印キーでも選べる。 */}
+              <div
+                className={OPT_LIST}
+                role="radiogroup"
+                aria-labelledby="opt-pull"
+              >
+                {PULL_ACTIONS.map((action) => (
+                  <label
+                    key={action.value}
+                    className="inline-flex cursor-pointer items-center gap-2 select-none"
+                    title={action.title}
+                  >
+                    <input
+                      type="radio"
+                      name="pull-action"
+                      className="m-0 size-4 shrink-0 accent-accent"
+                      title={action.title}
+                      checked={opts.pullAction === action.value}
+                      onChange={() => onOptsChange({ pullAction: action.value })}
+                    />
+                    <span>{action.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className={OPT_TITLE} id="opt-pull-px">
+                発火するまでの引きの量
+              </h3>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  className="h-8 w-full max-w-80 cursor-pointer accent-accent"
+                  min={PULL_MIN}
+                  max={PULL_MAX}
+                  step={PULL_STEP}
+                  value={opts.pullPx}
+                  aria-labelledby="opt-pull-px"
+                  aria-valuetext={`${opts.pullPx} ピクセル`}
+                  onChange={(e) =>
+                    onOptsChange({ pullPx: Number(e.currentTarget.value) })
+                  }
+                />
+                {/* 幅を固めるのは桁が変わってもつまみの右端を動かさないため。
+                    読み上げは上の aria-valuetext が持つ。 */}
+                <span
+                  className="w-14 shrink-0 text-sm tabular-nums"
+                  aria-hidden="true"
+                >
+                  {opts.pullPx}px
+                </span>
+              </div>
+              <p className={`${LEDE} mt-2`}>
+                上へ向かい続けた移動量がこれを超えると起きます。途中で下へ動くと数え直します。
+              </p>
             </div>
 
             <div>

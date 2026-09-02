@@ -93,6 +93,9 @@ export interface ActionRequest {
   on: boolean;
 }
 
+/** 上へ引き切ったときの動き。畳むか、読み直すか。 */
+export type PullAction = 'collapse' | 'reload';
+
 /** 画面の表示設定。localStorage に保存する。 */
 export interface Options {
   /**
@@ -113,6 +116,18 @@ export interface Options {
    * 掛かるのはおすすめとフォロー中だけで、自分で並びを決めて開いた画面には掛からない。
    */
   sweep: boolean;
+  /**
+   * 上へ引いたときに何をするか。畳むほうは見ている位置が動かないが、
+   * 読み直すほうは今の壁を捨てて先頭から取り直す（穴も壁ごと消える）。
+   */
+  pullAction: PullAction;
+  /**
+   * 発火するまでに要る、上へ向かい続けた移動量（px）。
+   * 跳ね返りや指の震えで起きない程度に取る。300 はホイールなら 3 目盛りほど、
+   * トラックパッドならひと振りに満たない。読み直しへ振るなら、見返すつもりの戻しでは
+   * 届かない量まで上げておく。
+   */
+  pullPx: number;
 }
 
 export const DEFAULT_OPTIONS: Options = {
@@ -125,4 +140,6 @@ export const DEFAULT_OPTIONS: Options = {
   blur: true,
   split: true,
   sweep: true,
+  pullAction: 'collapse',
+  pullPx: 300,
 };

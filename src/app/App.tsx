@@ -409,6 +409,8 @@ export function App() {
           armed={armed}
           onExit={dismiss}
           onCollapse={collapse}
+          // 上へ引き切ったときに読み直すか畳むかは設定次第。畳むほうを選んでいるあいだは渡さない。
+          onReload={opts.pullAction === 'reload' ? reload : null}
           keyboardActive={!settingsOpen && !shortcutsOpen && lightboxIndex < 0}
         />
         {/* 無限スクロールのセンチネル。高さ 0 だと交差が起きないので 1px だけ持たせる。 */}

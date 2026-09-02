@@ -32,8 +32,13 @@ interface MasonryGridProps {
   armed: ReadonlySet<string>;
   /** その投稿のタイルが全部画面の外へ出た合図。 */
   onExit(id: string): void;
-  /** 穴を畳んでよい合図。上へ戻り始めたときに返す。 */
+  /** 穴を畳んでよい合図。上へ引き切ったときに返す。 */
   onCollapse(): void;
+  /**
+   * 上へ引き切ったときに壁を読み直す合図。設定で畳むほうを選んでいるあいだは null で、
+   * そのときは onCollapse だけを返す。引きの量（opts.pullPx）はどちらでも同じ。
+   */
+  onReload: (() => void) | null;
   /** モーダルやライトボックスが開いていないときだけ壁のキー操作を受ける。 */
   keyboardActive: boolean;
 }
@@ -46,12 +51,6 @@ const GAP = 12;
  * 見えるので、ひと呼吸ぶん外へ出てから外す。
  */
 const SWEEP_MARGIN = 200;
-
-/**
- * 穴を畳むまでに要る、上向きの移動量。跳ね返りや指の震えで詰まらない程度に取る。
- * ホイールなら 3 目盛りほど、トラックパッドならひと振りに満たない。
- */
-const COLLAPSE_PULL = 300;
 
 /** 極端な縦長・横長は列を壊すので範囲を丸める。 */
 function aspectOf(media: Media): number {
@@ -115,7 +114,8 @@ export function findTopLeftVisible(
 }
 
 export function MasonryGrid(props: MasonryGridProps) {
-  const { tiles, opts, onOpen, actions, onAction, onHide, armed, onExit, onCollapse, keyboardActive } = props;
+  const { tiles, opts, onOpen, actions, onAction, onHide, armed, onExit, onCollapse, onReload, keyboardActive } =
+    props;
   const gridRef = useRef<HTMLDivElement>(null);
   const containerWidth = useElementWidth(gridRef);
 
@@ -230,6 +230,9 @@ export function MasonryGrid(props: MasonryGridProps) {
   //
   // 畳むのは上へ戻り始めたとき。下へ読み進めている最中に詰めると、見ている場所より上が縮んで
   // 並びが動く。上へ向かっているあいだなら、動く先（下）は既に見た側になる。
+  //
+  // 引き切ったときに畳むか読み直すかは設定が決める。読み直しを選んでいるあいだは畳まない
+  //（壁ごと入れ替わるので穴は結果として消える）ぶん、畳む穴が無くても引きは数える。
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
@@ -249,11 +252,14 @@ export function MasonryGrid(props: MasonryGridProps) {
       span.top = Math.min(span.top, p.y);
       span.bottom = Math.max(span.bottom, p.y + p.height);
     });
-    if (spans.size === 0 && !holes) return;
+    if (spans.size === 0 && !holes && !onReload) return;
 
     let frame = 0;
     let last = window.scrollY;
     let pull = 0;
+    // 読み直すのはこの壁につき一度きり。読み直すと壁が空になり、その拍子に走るスクロールを
+    // 引きとして数えてしまうと、そのまま二度目へ続いてしまう。
+    let reloaded = false;
 
     /** 画面の上端にいちばん近いタイル。並び順はおおよそ上から下なので、先頭から見つけて足りる。 */
     const anchor = (wall: number) => {
@@ -278,14 +284,20 @@ export function MasonryGrid(props: MasonryGridProps) {
         onExit(id);
       }
 
-      if (!holes) return;
+      if (!holes && !onReload) return;
       const y = window.scrollY;
       const back = last - y;
       last = y;
       // 下向きが挟まったら数え直す。往復ではなく、上へ向かい続けたぶんだけを見る。
       pull = back > 0 ? pull + back : 0;
-      if (pull < COLLAPSE_PULL) return;
+      if (pull < opts.pullPx) return;
       pull = 0;
+      if (onReload) {
+        if (reloaded) return;
+        reloaded = true;
+        onReload();
+        return;
+      }
       anchorRef.current = anchor(wall);
       setStill(true);
       onCollapse();
@@ -303,7 +315,7 @@ export function MasonryGrid(props: MasonryGridProps) {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, [armed, tiles, placements, onExit, onCollapse]);
+  }, [armed, tiles, placements, onExit, onCollapse, onReload, opts.pullPx]);
 
   // 畳んだぶんスクロール量を戻す。描く前に済ませないと、詰まった壁が一度描かれてから跳ねる。
   // 遷移を戻すのもここ。同じ位置のまま戻すので、動きは起きない。
