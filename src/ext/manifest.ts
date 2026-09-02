@@ -30,8 +30,16 @@ export function manifest(target: Target, version: string): Record<string, unknow
     ...(target === 'firefox'
       ? {
           browser_specific_settings: {
-            // 署名や設定の保存先を決めるのに ID が要る。配布しないので固定値でよい。
-            gecko: { id: 'xpic2@localhost', strict_min_version: '128.0' },
+            // 署名や設定の保存先を決めるID。公開後の更新でも変えない。
+            gecko: {
+              id: '@xpic2-gitdmnt',
+              // Firefox の組み込み同意画面をデスクトップ・Androidとも使える版から対象にする。
+              strict_min_version: '142.0',
+              // X の投稿・応答・セッション情報・検索語・ユーザー操作を、主機能のためXへ送受信する。
+              data_collection_permissions: {
+                required: ['personalCommunications', 'websiteContent', 'searchTerms', 'websiteActivity'],
+              },
+            },
           },
         }
       : {}),
